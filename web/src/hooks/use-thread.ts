@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createThread, getThread, sendMessage, getRandomPrompt } from '@/lib/api'
+import {
+  createThread,
+  getThread,
+  getThreads,
+  sendMessage,
+  getRandomPrompt,
+} from '@/lib/api'
 
 const threadKeys = {
   all: ['threads'] as const,
@@ -14,6 +20,13 @@ export function useRandomPrompt() {
   return useQuery({
     queryKey: promptKeys.random,
     queryFn: getRandomPrompt,
+  })
+}
+
+export function useThreads() {
+  return useQuery({
+    queryKey: threadKeys.all,
+    queryFn: getThreads,
   })
 }
 

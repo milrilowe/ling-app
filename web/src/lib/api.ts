@@ -44,14 +44,14 @@ async function callAPI<T>(
   }
 }
 
-interface Message {
+export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: string
 }
 
-interface Thread {
+export interface Thread {
   id: string
   messages: Message[]
   createdAt: string
@@ -88,5 +88,8 @@ export async function sendMessage(
   })
 }
 
-export type { Message, Thread }
+export async function getThreads(): Promise<Thread[]> {
+  return callAPI<Thread[]>('/api/threads')
+}
+
 export { ApiError }

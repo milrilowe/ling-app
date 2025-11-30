@@ -9,48 +9,64 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as CRouteImport } from './routes/c'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CThreadIdRouteImport } from './routes/c.$threadId'
 
+const CRoute = CRouteImport.update({
+  id: '/c',
+  path: '/c',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CThreadIdRoute = CThreadIdRouteImport.update({
-  id: '/c/$threadId',
-  path: '/c/$threadId',
-  getParentRoute: () => rootRouteImport,
+  id: '/$threadId',
+  path: '/$threadId',
+  getParentRoute: () => CRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/c': typeof CRouteWithChildren
   '/c/$threadId': typeof CThreadIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/c': typeof CRouteWithChildren
   '/c/$threadId': typeof CThreadIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/c': typeof CRouteWithChildren
   '/c/$threadId': typeof CThreadIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/c/$threadId'
+  fullPaths: '/' | '/c' | '/c/$threadId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/c/$threadId'
-  id: '__root__' | '/' | '/c/$threadId'
+  to: '/' | '/c' | '/c/$threadId'
+  id: '__root__' | '/' | '/c' | '/c/$threadId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CThreadIdRoute: typeof CThreadIdRoute
+  CRoute: typeof CRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/c': {
+      id: '/c'
+      path: '/c'
+      fullPath: '/c'
+      preLoaderRoute: typeof CRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -60,17 +76,27 @@ declare module '@tanstack/react-router' {
     }
     '/c/$threadId': {
       id: '/c/$threadId'
-      path: '/c/$threadId'
+      path: '/$threadId'
       fullPath: '/c/$threadId'
       preLoaderRoute: typeof CThreadIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof CRoute
     }
   }
 }
 
+interface CRouteChildren {
+  CThreadIdRoute: typeof CThreadIdRoute
+}
+
+const CRouteChildren: CRouteChildren = {
+  CThreadIdRoute: CThreadIdRoute,
+}
+
+const CRouteWithChildren = CRoute._addFileChildren(CRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CThreadIdRoute: CThreadIdRoute,
+  CRoute: CRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

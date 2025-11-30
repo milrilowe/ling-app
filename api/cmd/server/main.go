@@ -56,6 +56,7 @@ func main() {
 		api.GET("/prompts/random", handlers.GetRandomPrompt)
 
 		// Threads
+		api.GET("/threads", threadHandler.GetThreads)
 		api.POST("/threads", threadHandler.CreateThread)
 		api.GET("/threads/:id", threadHandler.GetThread)
 		api.POST("/threads/:id/messages", threadHandler.SendMessage)

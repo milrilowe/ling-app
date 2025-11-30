@@ -34,6 +34,16 @@ type SendMessageRequest struct {
 	Content string `json:"content"`
 }
 
+// GetThreads retrieves all threads, ordered by most recent
+func (h *ThreadHandler) GetThreads(c *gin.Context) {
+	var threads []models.Thread
+	if err := h.DB.Order("created_at DESC").Find(&threads).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch threads"})
+		return
+	}
+	c.JSON(http.StatusOK, threads)
+}
+
 // CreateThread creates a new conversation thread
 func (h *ThreadHandler) CreateThread(c *gin.Context) {
 	var req CreateThreadRequest

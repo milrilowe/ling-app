@@ -19,3 +19,10 @@ func (t *Thread) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+func (t *Thread) AfterFind(tx *gorm.DB) error {
+	if t.Messages == nil {
+		t.Messages = []Message{}
+	}
+	return nil
+}

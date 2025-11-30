@@ -1,19 +1,8 @@
-import { useForm } from 'react-hook-form'
 import { useRandomPrompt, useCreateThread } from '@/hooks/use-thread'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from '@/components/ui/form'
 import { useNavigate } from '@tanstack/react-router'
-
-interface FormData {
-  message: string
-}
+import { PromptCard } from './components/PromptCard'
+import { AIGreeting } from './components/AIGreeting'
+import { ChatInput } from '../chat/components/ChatInput'
 
 export function Home() {
   const navigate = useNavigate()
@@ -21,18 +10,17 @@ export function Home() {
   const { data: prompt, isLoading: isLoadingPrompt } = useRandomPrompt()
   const createThreadMutation = useCreateThread()
 
-  const form = useForm<FormData>({
-    defaultValues: {
-      message: '',
-    },
-  })
+  // AI greeting based on the prompt
+  const aiGreeting = prompt
+    ? `Hi! ${prompt} I'm here to help you practice. Just start talking!`
+    : ''
 
-  const onSubmit = (data: FormData) => {
+  const handleStart = (message: string) => {
     if (prompt) {
       createThreadMutation.mutate(
         {
-          initialPrompt: prompt,
-          firstUserMessage: data.message,
+          initialPrompt: aiGreeting,
+          firstUserMessage: message,
         },
         {
           onSuccess: (thread) => {
@@ -52,44 +40,36 @@ export function Home() {
   }
 
   return (
-    <div className="flex h-screen flex-col items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-success/10 via-background to-info/10 p-4">
       <div className="w-full max-w-2xl space-y-8">
-        <div className="text-center">
-          <h1 className="mb-4 text-4xl font-bold">ESL Practice</h1>
-          <p className="mb-8 text-xl text-muted-foreground">{prompt}</p>
+        {/* Title */}
+        <div className="animate-in fade-in slide-in-from-bottom-1 text-center duration-300">
+          <h1 className="mb-2 bg-gradient-to-r from-success to-info bg-clip-text text-5xl font-bold text-transparent">
+            Practice English
+          </h1>
+          <p className="text-lg text-muted-foreground">
+            Let's have a conversation!
+          </p>
         </div>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="message"
-              rules={{ required: 'Please type a response' }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <Input
-                      placeholder="Type your response..."
-                      disabled={createThreadMutation.isPending}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={createThreadMutation.isPending}
-            >
-              {createThreadMutation.isPending ? 'Starting...' : 'Start Conversation'}
-            </Button>
-          </form>
-        </Form>
+        {/* Prompt Card */}
+        {prompt && <PromptCard prompt={prompt} />}
 
+        {/* AI Greeting */}
+        {aiGreeting && <AIGreeting message={aiGreeting} />}
+
+        {/* Input */}
+        <div className="animate-in fade-in slide-in-from-bottom-5 duration-1000">
+          <ChatInput
+            onSubmit={handleStart}
+            disabled={createThreadMutation.isPending}
+            placeholder="Type your response to start..."
+          />
+        </div>
+
+        {/* Error Message */}
         {createThreadMutation.isError && (
-          <p className="text-center text-destructive">
+          <p className="animate-in fade-in text-center text-destructive">
             Failed to start conversation. Please try again.
           </p>
         )}
