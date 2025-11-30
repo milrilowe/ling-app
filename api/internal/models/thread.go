@@ -1,0 +1,21 @@
+package models
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+type Thread struct {
+	ID        uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
+	Messages  []Message `gorm:"foreignKey:ThreadID;constraint:OnDelete:CASCADE" json:"messages"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+func (t *Thread) BeforeCreate(tx *gorm.DB) error {
+	if t.ID == uuid.Nil {
+		t.ID = uuid.New()
+	}
+	return nil
+}
