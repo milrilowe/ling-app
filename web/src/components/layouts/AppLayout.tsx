@@ -1,4 +1,5 @@
-import { Sidebar } from '../Sidebar'
+import { AppSidebar } from '../Sidebar'
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
 import type { ReactNode } from 'react'
 
 interface AppLayoutProps {
@@ -7,9 +8,14 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-hidden">{children}</main>
-    </div>
+    <SidebarProvider defaultOpen={false}>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger />
+        </header>
+        <main className="flex-1 overflow-hidden">{children}</main>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
