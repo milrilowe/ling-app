@@ -73,19 +73,21 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 		return
 	}
 
-	// Add initial AI prompt message
-	aiMessage := models.Message{
-		ID:        uuid.New(),
-		ThreadID:  thread.ID,
-		Role:      "assistant",
-		Content:   req.InitialPrompt,
-		Timestamp: time.Now(),
-	}
+	// Add initial AI prompt message only if provided
+	if req.InitialPrompt != "" {
+		aiMessage := models.Message{
+			ID:        uuid.New(),
+			ThreadID:  thread.ID,
+			Role:      "assistant",
+			Content:   req.InitialPrompt,
+			Timestamp: time.Now(),
+		}
 
-	if err := h.DB.Create(&aiMessage).Error; err != nil {
-		log.Printf("Error creating AI message: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
-		return
+		if err := h.DB.Create(&aiMessage).Error; err != nil {
+			log.Printf("Error creating AI message: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
+			return
+		}
 	}
 
 	// Add first user message if provided
@@ -105,10 +107,17 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 		}
 
 		// Generate AI response
-		conversationHistory := []services.ConversationMessage{
-			{Role: "assistant", Content: req.InitialPrompt},
-			{Role: "user", Content: req.FirstUserMessage},
+		conversationHistory := []services.ConversationMessage{}
+		if req.InitialPrompt != "" {
+			conversationHistory = append(conversationHistory, services.ConversationMessage{
+				Role:    "assistant",
+				Content: req.InitialPrompt,
+			})
 		}
+		conversationHistory = append(conversationHistory, services.ConversationMessage{
+			Role:    "user",
+			Content: req.FirstUserMessage,
+		})
 
 		aiResponse, err := h.OpenAIClient.Generate(conversationHistory)
 		if err != nil {
