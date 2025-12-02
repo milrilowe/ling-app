@@ -1,12 +1,11 @@
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ThreadListItem } from '@/features/sidebar/components/ThreadListItem'
 import { useThreads } from '@/hooks/use-thread'
 import { useNavigate } from '@tanstack/react-router'
-import { Menu, Plus, Settings } from 'lucide-react'
+import { Plus, Settings } from 'lucide-react'
 
 function SidebarContent() {
   const navigate = useNavigate()
@@ -61,29 +60,8 @@ function SidebarContent() {
 
 export function Sidebar() {
   return (
-    <>
-      {/* Desktop Sidebar */}
-      <aside className="hidden h-screen w-64 shrink-0 border-r bg-sidebar md:flex">
-        <SidebarContent />
-      </aside>
-
-      {/* Mobile Sidebar */}
-      <div className="md:hidden">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="fixed left-4 top-4 z-50"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0">
-            <SidebarContent />
-          </SheetContent>
-        </Sheet>
-      </div>
-    </>
+    <aside className="h-screen w-64 shrink-0 border-r bg-sidebar flex flex-col">
+      <SidebarContent />
+    </aside>
   )
 }

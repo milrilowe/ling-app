@@ -17,7 +17,6 @@ export function usePushToTalk({
   disabled = false,
 }: UsePushToTalkOptions = {}) {
   const audioRecorder = useAudioRecorder()
-  const [isHolding, setIsHolding] = useState(false)
   const isHoldingRef = useRef(false)
 
   // Track audioBlob and trigger callback when it changes
@@ -32,7 +31,6 @@ export function usePushToTalk({
   const startRecording = useCallback(async () => {
     if (disabled || isHoldingRef.current) return
 
-    setIsHolding(true)
     isHoldingRef.current = true
     onRecordingStart?.()
     await audioRecorder.startRecording()
@@ -41,7 +39,6 @@ export function usePushToTalk({
   const stopRecording = useCallback(() => {
     if (!isHoldingRef.current) return
 
-    setIsHolding(false)
     isHoldingRef.current = false
     onRecordingEnd?.()
     audioRecorder.stopRecording()

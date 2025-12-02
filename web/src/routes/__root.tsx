@@ -3,6 +3,8 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import TanStackQueryDevtools from '@/integrations/tanstack-query/devtools'
+import { AudioPlayerProvider } from '@/contexts/AudioPlayerContext'
+import { Sidebar } from '@/components/Sidebar'
 
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -16,8 +18,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootComponent() {
   return (
-    <>
-      <Outlet />
+    <AudioPlayerProvider>
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar />
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
       <TanStackDevtools
         config={{
           position: 'bottom-right',
@@ -30,6 +37,6 @@ function RootComponent() {
           TanStackQueryDevtools,
         ]}
       />
-    </>
+    </AudioPlayerProvider>
   )
 }

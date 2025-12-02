@@ -13,7 +13,7 @@ interface AudioPlayerProps {
 }
 
 export function AudioPlayer({ url, className, autoPlay = false }: AudioPlayerProps) {
-  const { isPlaying, isLoading, currentTime, duration, error, play, pause, seek, load } = useAudioPlayer(url)
+  const { isPlaying, isLoading, currentTime, duration, error, play, pause, seek } = useAudioPlayer(url)
   const [isMuted, setIsMuted] = useState(false)
   const hasAutoPlayed = useRef(false)
 

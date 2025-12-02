@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSendAudioMessage } from '@/hooks/use-send-audio-message'
-import { useAudioPlayer } from '@/hooks/use-audio-player'
+import { useAudioPlayerContext } from '@/contexts/AudioPlayerContext'
 import type { ConversationState } from '../types'
 
 interface AudioPipelineOptions {
@@ -12,7 +12,7 @@ interface AudioPipelineOptions {
 export function useAudioPipeline({ threadId, onAudioEnded, onError }: AudioPipelineOptions) {
   const [state, setState] = useState<ConversationState>('idle')
   const sendAudioMutation = useSendAudioMessage(threadId)
-  const audioPlayer = useAudioPlayer()
+  const audioPlayer = useAudioPlayerContext()
 
   const handleAudioRecorded = useCallback(async (audioBlob: Blob) => {
     setState('ai-thinking')
