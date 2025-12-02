@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"time"
 
 	"ling-app/api/internal/config"
 	"ling-app/api/internal/db"
@@ -31,11 +33,36 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize OpenAI client
+	// Initialize storage service
+	storageService, err := services.NewStorageService(
+		cfg.S3Endpoint,
+		cfg.S3AccessKey,
+		cfg.S3SecretKey,
+		cfg.S3Bucket,
+		cfg.S3Region,
+	)
+	if err != nil {
+		log.Fatal("Failed to initialize storage service:", err)
+		os.Exit(1)
+	}
+
+	// Ensure MinIO bucket exists
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := storageService.EnsureBucketExists(ctx); err != nil {
+		log.Printf("Warning: Failed to ensure bucket exists: %v", err)
+	} else {
+		log.Printf("Storage bucket '%s' is ready", cfg.S3Bucket)
+	}
+
+	// Initialize AI clients
 	openAIClient := services.NewOpenAIClient(cfg.OpenAIAPIKey)
+	whisperClient := services.NewWhisperClient(cfg.OpenAIAPIKey)
+	elevenLabsClient := services.NewElevenLabsClient(cfg.ElevenLabsAPIKey)
 
 	// Initialize handlers
-	threadHandler := handlers.NewThreadHandler(database, openAIClient)
+	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, elevenLabsClient)
+	audioHandler := handlers.NewAudioHandler(storageService)
 
 	// Set Gin mode
 	gin.SetMode(cfg.GinMode)
@@ -60,6 +87,10 @@ func main() {
 		api.POST("/threads", threadHandler.CreateThread)
 		api.GET("/threads/:id", threadHandler.GetThread)
 		api.POST("/threads/:id/messages", threadHandler.SendMessage)
+		api.POST("/threads/:id/messages/audio", threadHandler.SendAudioMessage)
+
+		// Audio - use *key to capture full path including slashes
+		api.GET("/audio/*key", audioHandler.GetAudio)
 	}
 
 	// Start server

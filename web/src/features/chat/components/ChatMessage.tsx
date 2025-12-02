@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { AudioPlayer } from '@/components/audio/AudioPlayer'
 import { formatMessageTime } from '@/lib/formatting'
 import { cn } from '@/lib/utils'
 
@@ -6,9 +7,11 @@ interface ChatMessageProps {
   role: 'user' | 'assistant'
   content: string
   timestamp: string | Date
+  audioUrl?: string
+  hasAudio?: boolean
 }
 
-export function ChatMessage({ role, content, timestamp }: ChatMessageProps) {
+export function ChatMessage({ role, content, timestamp, audioUrl, hasAudio }: ChatMessageProps) {
   const isUser = role === 'user'
 
   return (
@@ -38,7 +41,7 @@ export function ChatMessage({ role, content, timestamp }: ChatMessageProps) {
         </Avatar>
 
         {/* Message bubble */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-2">
           <div
             className={cn(
               'rounded-2xl px-4 py-2',
@@ -51,6 +54,11 @@ export function ChatMessage({ role, content, timestamp }: ChatMessageProps) {
               {content}
             </p>
           </div>
+
+          {/* Audio player */}
+          {hasAudio && audioUrl && (
+            <AudioPlayer url={audioUrl} className="max-w-sm" autoPlay={!isUser} />
+          )}
 
           {/* Timestamp - shown on hover */}
           <span

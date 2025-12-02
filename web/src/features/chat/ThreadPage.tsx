@@ -1,4 +1,5 @@
 import { useSendMessage, useThread } from '@/hooks/use-thread'
+import { useSendAudioMessage } from '@/hooks/use-send-audio-message'
 import { useParams } from '@tanstack/react-router'
 import { ChatMessage } from './components/ChatMessage'
 import { ChatInput } from './components/ChatInput'
@@ -12,12 +13,15 @@ export function ChatThread() {
 
   const { data: thread, isLoading, isError } = useThread(threadId)
   const sendMessageMutation = useSendMessage(threadId)
+  const sendAudioMutation = useSendAudioMessage(threadId)
   const [latestMessageId, setLatestMessageId] = useState<string | null>(null)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
 
+  const isAnyPending = sendMessageMutation.isPending || sendAudioMutation.isPending
+
   const scrollRef = useAutoScroll<HTMLDivElement>([
     thread?.messages.length,
-    sendMessageMutation.isPending,
+    isAnyPending,
     pendingMessage,
   ])
 
@@ -26,6 +30,19 @@ export function ChatThread() {
     sendMessageMutation.mutate(message, {
       onSuccess: (newMessage) => {
         setLatestMessageId(newMessage.id)
+        setPendingMessage(null)
+      },
+      onError: () => {
+        setPendingMessage(null)
+      },
+    })
+  }
+
+  const handleSendAudio = (audioBlob: Blob) => {
+    setPendingMessage('🎤 Sending voice message...')
+    sendAudioMutation.mutate(audioBlob, {
+      onSuccess: (data) => {
+        setLatestMessageId(data.assistantMessage.id)
         setPendingMessage(null)
       },
       onError: () => {
@@ -67,6 +84,8 @@ export function ChatThread() {
               role={message.role as 'user' | 'assistant'}
               content={message.content}
               timestamp={message.timestamp}
+              audioUrl={message.audioUrl}
+              hasAudio={message.hasAudio}
             />
           )
         )}
@@ -78,14 +97,15 @@ export function ChatThread() {
             timestamp={new Date().toISOString()}
           />
         )}
-        {sendMessageMutation.isPending && <TypingIndicator />}
+        {isAnyPending && <TypingIndicator />}
       </div>
 
       {/* Input Area */}
       <div className="border-t bg-card p-4">
         <ChatInput
           onSubmit={handleSendMessage}
-          disabled={sendMessageMutation.isPending}
+          onAudioSubmit={handleSendAudio}
+          disabled={isAnyPending}
         />
       </div>
     </div>

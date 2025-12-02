@@ -28,6 +28,19 @@ type Config struct {
 	// OpenAI
 	OpenAIAPIKey string
 
+	// ElevenLabs
+	ElevenLabsAPIKey string
+
+	// S3/MinIO Storage
+	S3Endpoint   string
+	S3AccessKey  string
+	S3SecretKey  string
+	S3Bucket     string
+	S3Region     string
+
+	// Audio Limits
+	MaxAudioFileSize int64
+
 	// CORS
 	CORSAllowedOrigins []string
 }
@@ -52,6 +65,16 @@ func Load() *Config {
 		MLServiceURL: getEnv("ML_SERVICE_URL", "http://localhost:8000"),
 
 		OpenAIAPIKey: getEnv("OPENAI_API_KEY", ""),
+
+		ElevenLabsAPIKey: getEnv("ELEVENLABS_API_KEY", ""),
+
+		S3Endpoint:  getEnv("S3_ENDPOINT", "http://localhost:9000"),
+		S3AccessKey: getEnv("S3_ACCESS_KEY", "minioadmin"),
+		S3SecretKey: getEnv("S3_SECRET_KEY", "minioadmin"),
+		S3Bucket:    getEnv("S3_BUCKET", "ling-app-audio"),
+		S3Region:    getEnv("S3_REGION", "us-east-1"),
+
+		MaxAudioFileSize: 10485760, // 10MB
 
 		CORSAllowedOrigins: strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000"), ","),
 	}
