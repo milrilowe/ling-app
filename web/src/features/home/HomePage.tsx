@@ -1,78 +1,102 @@
-import { useRandomPrompt, useCreateThread } from '@/hooks/use-thread'
-import { useNavigate } from '@tanstack/react-router'
-import { PromptCard } from './components/PromptCard'
-import { AIGreeting } from './components/AIGreeting'
-import { ChatInput } from '../chat/components/ChatInput'
+import { useEffect, useState } from 'react'
+import { useCreateThread } from '@/hooks/use-thread'
+import { AIAvatar } from '@/features/conversation/components/Avatar/AIAvatar'
+import { PushToTalkButton } from '@/features/conversation/components/PushToTalk/PushToTalkButton'
+import { StatusText } from '@/features/conversation/components/StatusText'
+import { useAudioPipeline } from '@/features/conversation/hooks/use-audio-pipeline'
 
 export function Home() {
-  const navigate = useNavigate()
-
-  const { data: prompt, isLoading: isLoadingPrompt } = useRandomPrompt()
+  const [threadId, setThreadId] = useState<string | null>(null)
   const createThreadMutation = useCreateThread()
 
-  // AI greeting based on the prompt
-  const aiGreeting = prompt
-    ? `Hi! ${prompt} I'm here to help you practice. Just start talking!`
-    : ''
-
-  const handleStart = (message: string) => {
-    if (prompt) {
-      createThreadMutation.mutate(
-        {
-          initialPrompt: aiGreeting,
-          firstUserMessage: message,
-        },
-        {
-          onSuccess: (thread) => {
-            navigate({ to: '/c/$threadId', params: { threadId: thread.id } })
-          },
-        }
-      )
+  // Create thread on mount
+  useEffect(() => {
+    const createThread = async () => {
+      try {
+        const thread = await createThreadMutation.mutateAsync({
+          initialPrompt: 'Let\'s have a conversation!',
+        })
+        setThreadId(thread.id)
+      } catch (error) {
+        console.error('Failed to create thread:', error)
+      }
     }
-  }
 
-  if (isLoadingPrompt) {
+    createThread()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Show loading state while creating thread
+  if (!threadId) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="relative flex h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background overflow-hidden">
+        <div className="flex flex-col items-center gap-8">
+          <AIAvatar
+            isThinking={createThreadMutation.isPending}
+            isSpeaking={false}
+            audioLevel={0.5}
+          />
+
+          <div className="text-center">
+            {createThreadMutation.isPending ? (
+              <p className="text-lg text-muted-foreground">
+                Starting conversation...
+              </p>
+            ) : createThreadMutation.isError ? (
+              <>
+                <h1 className="text-2xl font-semibold text-foreground mb-2">
+                  Oops!
+                </h1>
+                <p className="text-destructive">
+                  Failed to start conversation. Please refresh to try again.
+                </p>
+              </>
+            ) : (
+              <p className="text-lg text-muted-foreground">
+                Loading...
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     )
   }
 
+  // Once thread is created, render the conversation UI
+  return <ConversationUI threadId={threadId} />
+}
+
+function ConversationUI({ threadId }: { threadId: string }) {
+  const { state, handleAudioRecorded, isProcessing } = useAudioPipeline({
+    threadId,
+  })
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-success/10 via-background to-info/10 p-4">
-      <div className="w-full max-w-2xl space-y-8">
-        {/* Title */}
-        <div className="animate-in fade-in slide-in-from-bottom-1 text-center duration-300">
-          <h1 className="mb-2 bg-gradient-to-r from-success to-info bg-clip-text text-5xl font-bold text-transparent">
-            Practice English
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            Let's have a conversation!
-          </p>
-        </div>
+    <div className="relative flex h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background overflow-hidden">
+      {/* Centered Avatar Section */}
+      <div className="flex flex-col items-center gap-8">
+        <AIAvatar
+          isThinking={state === 'ai-thinking'}
+          isSpeaking={state === 'ai-speaking'}
+          audioLevel={0.5}
+        />
 
-        {/* Prompt Card */}
-        {prompt && <PromptCard prompt={prompt} />}
+        {/* Status text */}
+        <StatusText state={state} />
+      </div>
 
-        {/* AI Greeting */}
-        {aiGreeting && <AIGreeting message={aiGreeting} />}
+      {/* Push-to-Talk Button (fixed bottom) */}
+      <div className="fixed bottom-12 left-1/2 -translate-x-1/2">
+        <PushToTalkButton
+          disabled={isProcessing}
+          onRecordingComplete={handleAudioRecorded}
+        />
+      </div>
 
-        {/* Input */}
-        <div className="animate-in fade-in slide-in-from-bottom-5 duration-1000">
-          <ChatInput
-            onSubmit={handleStart}
-            disabled={createThreadMutation.isPending}
-            placeholder="Type your response to start..."
-          />
-        </div>
-
-        {/* Error Message */}
-        {createThreadMutation.isError && (
-          <p className="animate-in fade-in text-center text-destructive">
-            Failed to start conversation. Please try again.
-          </p>
-        )}
+      {/* Screen reader status */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {state === 'ai-thinking' && 'AI is thinking...'}
+        {state === 'ai-speaking' && 'AI is speaking'}
+        {state === 'recording' && 'Recording your message'}
       </div>
     </div>
   )
