@@ -67,6 +67,18 @@ export function AppSidebar() {
 
             {/* Expanded view - show all threads */}
             <div className="group-data-[collapsible=icon]:hidden">
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={handleNewChat}
+                    className="mb-2"
+                  >
+                    <PenSquare className="h-4 w-4" />
+                    <span>New Conversation</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+
               {isLoading ? (
                 <div className="space-y-2 px-2">
                   {[...Array(5)].map((_, i) => (

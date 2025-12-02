@@ -9,6 +9,7 @@ export interface AudioPlayerState {
   duration: number
   error: string | null
   conversationState: ConversationState
+  currentUrl: string | null
 }
 
 export interface AudioPlayerActions {
@@ -28,6 +29,7 @@ export function useAudioPlayer(initialUrl?: string) {
     duration: 0,
     error: null,
     conversationState: 'idle',
+    currentUrl: initialUrl || null,
   })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -144,6 +146,7 @@ export function useAudioPlayer(initialUrl?: string) {
       urlRef.current = url
       audioRef.current.src = url
       audioRef.current.load()
+      setState(prev => ({ ...prev, currentUrl: url }))
     }
   }, [])
 

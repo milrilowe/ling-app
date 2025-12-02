@@ -58,10 +58,8 @@ export function ConversationUI({ threadId }: ConversationUIProps) {
       try {
         audioPlayer.setConversationState('ai-thinking')
 
-        // Create the thread
-        const newThread = await createThreadMutation.mutateAsync({
-          initialPrompt: 'Voice conversation',
-        })
+        // Create the thread (no initial prompt for voice conversations)
+        const newThread = await createThreadMutation.mutateAsync({})
 
         // Send the audio message with the new thread ID
         const response = await sendAudioMessage(newThread.id, audioBlob)
