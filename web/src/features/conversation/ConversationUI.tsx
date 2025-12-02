@@ -24,6 +24,7 @@ export function ConversationUI({ threadId }: ConversationUIProps) {
   const audioPlayer = useAudioPlayerContext()
   const [localState, setLocalState] = useState<ConversationState>('idle')
   const hasPlayedAudioRef = useRef(false)
+  const pendingNavigationRef = useRef<{ threadId: string } | null>(null)
 
   // Only use audio pipeline if we have a threadId
   const audioPipelineResult = threadId
@@ -64,12 +65,23 @@ export function ConversationUI({ threadId }: ConversationUIProps) {
         // Send the audio message with the new thread ID
         const response = await sendAudioMessage(newThread.id, audioBlob)
 
-        // Navigate to the new thread with audio URL in state
-        navigate({
-          to: '/c/$threadId',
-          params: { threadId: newThread.id },
-          state: { audioUrl: response.assistantMessage.audioUrl }
-        })
+        // Load and play audio immediately without navigating
+        if (response.assistantMessage.audioUrl) {
+          audioPlayer.load(response.assistantMessage.audioUrl)
+          setTimeout(() => {
+            setLocalState('ai-speaking')
+            audioPlayer.play()
+          }, 500)
+
+          // Store the thread ID for navigation after audio finishes
+          pendingNavigationRef.current = { threadId: newThread.id }
+        } else {
+          // No audio, navigate immediately
+          navigate({
+            to: '/c/$threadId',
+            params: { threadId: newThread.id },
+          })
+        }
       } catch (error) {
         console.error('Failed to create thread or send message:', error)
         setLocalState('idle')
@@ -82,20 +94,39 @@ export function ConversationUI({ threadId }: ConversationUIProps) {
 
   // Listen for audio ending when we're managing state locally
   useEffect(() => {
-    if (!threadId && localState === 'ai-speaking' && !audioPlayer.isPlaying && audioPlayer.currentTime === 0) {
-      setLocalState('idle')
-    }
-  }, [threadId, localState, audioPlayer.isPlaying, audioPlayer.currentTime])
+    // Detect when audio finishes: not playing AND either currentTime is 0 (ended event fired)
+    // OR currentTime equals duration (audio reached the end)
+    const audioFinished = !audioPlayer.isPlaying && (
+      audioPlayer.currentTime === 0 ||
+      (audioPlayer.duration > 0 && Math.abs(audioPlayer.currentTime - audioPlayer.duration) < 0.1)
+    )
 
-  // Stop audio when navigating away from this thread
-  useEffect(() => {
-    return () => {
-      // Component is unmounting - stop audio if it's playing
-      if (audioPlayer.isPlaying) {
-        audioPlayer.pause()
+    if (!threadId && localState === 'ai-speaking' && audioFinished) {
+      setLocalState('idle')
+
+      // If we have a pending navigation, do it now
+      if (pendingNavigationRef.current) {
+        const { threadId: newThreadId } = pendingNavigationRef.current
+        pendingNavigationRef.current = null
+        navigate({
+          to: '/c/$threadId',
+          params: { threadId: newThreadId },
+        })
       }
     }
-  }, [audioPlayer])
+  }, [threadId, localState, audioPlayer.isPlaying, audioPlayer.currentTime, audioPlayer.duration, audioPlayer.error, navigate])
+
+  // Stop audio when the threadId changes (navigating between threads)
+  const prevThreadIdRef = useRef(threadId)
+  useEffect(() => {
+    const prevThreadId = prevThreadIdRef.current
+    prevThreadIdRef.current = threadId
+
+    // If we had a thread and now have a different thread, pause audio
+    if (prevThreadId !== undefined && prevThreadId !== threadId) {
+      audioPlayer.pause()
+    }
+  }, [threadId])
 
   return (
     <div className="relative flex h-full flex-col items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background overflow-hidden">

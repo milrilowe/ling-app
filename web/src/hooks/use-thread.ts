@@ -31,8 +31,13 @@ export function useThreads() {
 }
 
 export function useCreateThread() {
+  const queryClient = useQueryClient()
+
   return useMutation({
     mutationFn: createThread,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: threadKeys.all })
+    },
   })
 }
 

@@ -63,7 +63,22 @@ export function useAudioPlayer(initialUrl?: string) {
     })
 
     audio.addEventListener('error', (e) => {
-      console.error('Audio playback error:', e)
+      // Ignore errors when there's no src (initial state)
+      if (!audio.src || audio.src === window.location.href) {
+        return
+      }
+
+      const errorDetails = audio.error ? {
+        code: audio.error.code,
+        message: audio.error.message,
+        mediaErrorCodes: {
+          1: 'MEDIA_ERR_ABORTED',
+          2: 'MEDIA_ERR_NETWORK',
+          3: 'MEDIA_ERR_DECODE',
+          4: 'MEDIA_ERR_SRC_NOT_SUPPORTED'
+        }
+      } : 'Unknown error'
+      console.error('Audio playback error:', e, errorDetails, 'URL:', audio.src)
       setState(prev => ({
         ...prev,
         isPlaying: false,
