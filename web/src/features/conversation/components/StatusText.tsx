@@ -1,4 +1,4 @@
-import type { ConversationState } from '../types'
+import type { ConversationState } from '@/hooks/use-audio-player'
 
 interface StatusTextProps {
   state: ConversationState
@@ -9,7 +9,6 @@ const statusMessages: Record<ConversationState, string> = {
   recording: 'Listening...',
   'ai-thinking': 'Thinking...',
   'ai-speaking': '',
-  archived: '',
 }
 
 export function StatusText({ state }: StatusTextProps) {

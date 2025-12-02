@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useSendAudioMessage } from '@/hooks/use-send-audio-message'
 import { useAudioPlayerContext } from '@/contexts/AudioPlayerContext'
-import type { ConversationState } from '../types'
 
 interface AudioPipelineOptions {
   threadId: string
@@ -10,12 +9,11 @@ interface AudioPipelineOptions {
 }
 
 export function useAudioPipeline({ threadId, onAudioEnded, onError }: AudioPipelineOptions) {
-  const [state, setState] = useState<ConversationState>('idle')
   const sendAudioMutation = useSendAudioMessage(threadId)
   const audioPlayer = useAudioPlayerContext()
 
   const handleAudioRecorded = useCallback(async (audioBlob: Blob) => {
-    setState('ai-thinking')
+    audioPlayer.setConversationState('ai-thinking')
 
     try {
       const response = await sendAudioMutation.mutateAsync(audioBlob)
@@ -26,37 +24,33 @@ export function useAudioPipeline({ threadId, onAudioEnded, onError }: AudioPipel
 
         // Wait a bit for metadata to load, then play
         setTimeout(() => {
-          setState('ai-speaking')
+          audioPlayer.setConversationState('ai-speaking')
           audioPlayer.play()
         }, 500)
       } else {
-        setState('idle')
+        audioPlayer.setConversationState('idle')
       }
     } catch (error) {
       console.error('Audio pipeline error:', error)
-      setState('idle')
+      audioPlayer.setConversationState('idle')
       onError?.(error instanceof Error ? error : new Error('Unknown error'))
     }
   }, [sendAudioMutation, audioPlayer, onError])
 
-  // Listen for audio ending
+  // Listen for audio ending - the audio player will set state to idle when ended
   useEffect(() => {
-    if (state === 'ai-speaking' && !audioPlayer.isPlaying && audioPlayer.currentTime === 0) {
-      setState('idle')
+    if (audioPlayer.conversationState === 'ai-speaking' && !audioPlayer.isPlaying && audioPlayer.currentTime === 0) {
       onAudioEnded?.()
     }
-  }, [state, audioPlayer.isPlaying, audioPlayer.currentTime, onAudioEnded])
+  }, [audioPlayer.conversationState, audioPlayer.isPlaying, audioPlayer.currentTime, onAudioEnded])
 
   const reset = useCallback(() => {
-    setState('idle')
+    audioPlayer.setConversationState('idle')
     audioPlayer.pause()
   }, [audioPlayer])
 
   return {
-    state,
     handleAudioRecorded,
-    audioPlayer,
     reset,
-    isProcessing: state === 'ai-thinking' || state === 'ai-speaking',
   }
 }

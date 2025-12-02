@@ -1,11 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 
+export type ConversationState = 'idle' | 'recording' | 'ai-thinking' | 'ai-speaking'
+
 export interface AudioPlayerState {
   isPlaying: boolean
   isLoading: boolean
   currentTime: number
   duration: number
   error: string | null
+  conversationState: ConversationState
 }
 
 export interface AudioPlayerActions {
@@ -14,6 +17,7 @@ export interface AudioPlayerActions {
   seek: (time: number) => void
   setPlaybackRate: (rate: number) => void
   load: (url: string) => void
+  setConversationState: (state: ConversationState) => void
 }
 
 export function useAudioPlayer(initialUrl?: string) {
@@ -23,6 +27,7 @@ export function useAudioPlayer(initialUrl?: string) {
     currentTime: 0,
     duration: 0,
     error: null,
+    conversationState: 'idle',
   })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -59,7 +64,12 @@ export function useAudioPlayer(initialUrl?: string) {
     })
 
     audio.addEventListener('ended', () => {
-      setState(prev => ({ ...prev, isPlaying: false, currentTime: 0 }))
+      setState(prev => ({
+        ...prev,
+        isPlaying: false,
+        currentTime: 0,
+        conversationState: 'idle' // Reset conversation state when audio ends
+      }))
     })
 
     audio.addEventListener('error', (e) => {
@@ -137,6 +147,10 @@ export function useAudioPlayer(initialUrl?: string) {
     }
   }, [])
 
+  const setConversationState = useCallback((conversationState: ConversationState) => {
+    setState(prev => ({ ...prev, conversationState }))
+  }, [])
+
   return {
     ...state,
     play,
@@ -144,5 +158,6 @@ export function useAudioPlayer(initialUrl?: string) {
     seek,
     setPlaybackRate,
     load,
+    setConversationState,
   }
 }

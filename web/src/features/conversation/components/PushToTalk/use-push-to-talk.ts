@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useAudioRecorder } from '@/hooks/use-audio-recorder'
+import { useAudioPlayerContext } from '@/contexts/AudioPlayerContext'
 
 interface UsePushToTalkOptions {
   onRecordingComplete?: (audioBlob: Blob) => void
@@ -17,6 +18,7 @@ export function usePushToTalk({
   disabled = false,
 }: UsePushToTalkOptions = {}) {
   const audioRecorder = useAudioRecorder()
+  const audioPlayer = useAudioPlayerContext()
   const isHoldingRef = useRef(false)
 
   // Track audioBlob and trigger callback when it changes
@@ -32,17 +34,19 @@ export function usePushToTalk({
     if (disabled || isHoldingRef.current) return
 
     isHoldingRef.current = true
+    audioPlayer.setConversationState('recording')
     onRecordingStart?.()
     await audioRecorder.startRecording()
-  }, [disabled, audioRecorder, onRecordingStart])
+  }, [disabled, audioRecorder, audioPlayer, onRecordingStart])
 
   const stopRecording = useCallback(() => {
     if (!isHoldingRef.current) return
 
     isHoldingRef.current = false
+    audioPlayer.setConversationState('idle')
     onRecordingEnd?.()
     audioRecorder.stopRecording()
-  }, [audioRecorder, onRecordingEnd])
+  }, [audioRecorder, audioPlayer, onRecordingEnd])
 
   // Keyboard handler (spacebar)
   useEffect(() => {
