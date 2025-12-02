@@ -15,11 +15,14 @@ const statusMessages: Record<ConversationState, string> = {
 export function StatusText({ state }: StatusTextProps) {
   const message = statusMessages[state]
 
-  if (!message) return null
-
+  // Always render with fixed height to prevent layout shift
   return (
-    <p className="text-lg text-muted-foreground animate-pulse">
-      {message}
-    </p>
+    <div className="h-7 flex items-center justify-center">
+      {message && (
+        <p className="text-lg text-muted-foreground animate-pulse">
+          {message}
+        </p>
+      )}
+    </div>
   )
 }

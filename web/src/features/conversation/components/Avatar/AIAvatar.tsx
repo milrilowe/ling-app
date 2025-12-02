@@ -11,9 +11,9 @@ interface AIAvatarProps {
 
 export function AIAvatar({ isThinking, isSpeaking, audioLevel = 0.5 }: AIAvatarProps) {
   return (
-    <div className="relative flex flex-col items-center gap-8">
-      {/* Main avatar circle */}
-      <div className="relative">
+    <div className="relative flex flex-col items-center">
+      {/* Main avatar circle - wrapped in fixed-size container to prevent layout shift */}
+      <div className="relative w-48 h-48 flex items-center justify-center">
         <div
           className={cn(
             'relative h-48 w-48 rounded-full bg-gradient-to-br from-info via-success to-primary',
@@ -29,9 +29,9 @@ export function AIAvatar({ isThinking, isSpeaking, audioLevel = 0.5 }: AIAvatarP
           {isSpeaking && <AvatarVisualizer audioLevel={audioLevel} />}
         </div>
 
-        {/* Thinking indicator */}
+        {/* Thinking indicator - positioned absolutely to not affect layout */}
         {isThinking && (
-          <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
+          <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
             <ThinkingDots />
           </div>
         )}
