@@ -16,12 +16,14 @@ interface LocationState {
   audioUrl?: string
 }
 
+// Track which threads have had their audio played across component mounts
+const playedAudioThreads = new Set<string>()
+
 export function ConversationUI({ threadId }: ConversationUIProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const createThreadMutation = useCreateThread()
   const audioPlayer = useAudioPlayerContext()
-  const hasPlayedAudioRef = useRef(false)
 
   // Only use audio pipeline if we have a threadId
   const audioPipelineResult = threadId
@@ -35,22 +37,18 @@ export function ConversationUI({ threadId }: ConversationUIProps) {
   const isProcessing = state === 'ai-thinking' || state === 'ai-speaking'
 
   // Handle audio playback from navigation state
+  // Only play audio when we first navigate to a thread with audio
   useEffect(() => {
     const locationState = location.state as LocationState | undefined
-    if (threadId && locationState?.audioUrl && !hasPlayedAudioRef.current) {
+    if (threadId && locationState?.audioUrl && !playedAudioThreads.has(threadId)) {
       // We just navigated here with audio to play
-      hasPlayedAudioRef.current = true
+      playedAudioThreads.add(threadId)
       audioPlayer.load(locationState.audioUrl)
       setTimeout(() => {
         audioPlayer.play()
       }, 500)
     }
-  }, [threadId, location.state, audioPlayer])
-
-  // Reset the played audio flag when threadId changes
-  useEffect(() => {
-    hasPlayedAudioRef.current = false
-  }, [threadId])
+  }, [threadId, audioPlayer])
 
   const handleRecordingComplete = async (audioBlob: Blob) => {
     // If we don't have a thread yet, create one first
