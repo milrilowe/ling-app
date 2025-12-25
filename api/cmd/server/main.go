@@ -60,8 +60,14 @@ func main() {
 	whisperClient := services.NewWhisperClient(cfg.OpenAIAPIKey)
 	elevenLabsClient := services.NewElevenLabsClient(cfg.ElevenLabsAPIKey)
 
+	// Initialize ML client for pronunciation analysis
+	mlClient := services.NewMLClient(cfg.MLServiceURL, time.Duration(cfg.MLServiceTimeout)*time.Second)
+
+	// Initialize pronunciation worker
+	pronunciationWorker := services.NewPronunciationWorker(database, mlClient, storageService)
+
 	// Initialize handlers
-	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, elevenLabsClient)
+	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, elevenLabsClient, pronunciationWorker)
 	audioHandler := handlers.NewAudioHandler(storageService)
 
 	// Set Gin mode

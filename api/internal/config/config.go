@@ -23,7 +23,8 @@ type Config struct {
 	SessionMaxAge int
 
 	// ML Service
-	MLServiceURL string
+	MLServiceURL     string
+	MLServiceTimeout int // timeout in seconds for ML service calls
 
 	// OpenAI
 	OpenAIAPIKey string
@@ -62,7 +63,8 @@ func Load() *Config {
 		SessionSecret: getEnv("SESSION_SECRET", ""),
 		SessionMaxAge: 86400, // 24 hours
 
-		MLServiceURL: getEnv("ML_SERVICE_URL", "http://localhost:8000"),
+		MLServiceURL:     getEnv("ML_SERVICE_URL", "http://localhost:8000"),
+		MLServiceTimeout: 120, // 2 minutes for pronunciation analysis
 
 		OpenAIAPIKey: getEnv("OPENAI_API_KEY", ""),
 

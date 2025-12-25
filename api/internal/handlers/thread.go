@@ -17,20 +17,22 @@ import (
 )
 
 type ThreadHandler struct {
-	DB             *db.DB
-	OpenAIClient   *services.OpenAIClient
-	Storage        *services.StorageService
-	WhisperClient  *services.WhisperClient
-	ElevenLabsClient *services.ElevenLabsClient
+	DB                    *db.DB
+	OpenAIClient          *services.OpenAIClient
+	Storage               *services.StorageService
+	WhisperClient         *services.WhisperClient
+	ElevenLabsClient      *services.ElevenLabsClient
+	PronunciationWorker   *services.PronunciationWorker
 }
 
-func NewThreadHandler(database *db.DB, openAIClient *services.OpenAIClient, storage *services.StorageService, whisper *services.WhisperClient, elevenlabs *services.ElevenLabsClient) *ThreadHandler {
+func NewThreadHandler(database *db.DB, openAIClient *services.OpenAIClient, storage *services.StorageService, whisper *services.WhisperClient, elevenlabs *services.ElevenLabsClient, pronunciationWorker *services.PronunciationWorker) *ThreadHandler {
 	return &ThreadHandler{
-		DB:             database,
-		OpenAIClient:   openAIClient,
-		Storage:        storage,
-		WhisperClient:  whisper,
-		ElevenLabsClient: elevenlabs,
+		DB:                    database,
+		OpenAIClient:          openAIClient,
+		Storage:               storage,
+		WhisperClient:         whisper,
+		ElevenLabsClient:      elevenlabs,
+		PronunciationWorker:   pronunciationWorker,
 	}
 }
 
@@ -304,22 +306,28 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 		return
 	}
 
-	// Save user message with audio
+	// Save user message with audio (pronunciation analysis pending)
 	userMessage := models.Message{
-		ID:                   userMessageID,
-		ThreadID:             parsedID,
-		Role:                 "user",
-		Content:              transcription.Text,
-		AudioURL:             &userAudioKey,
-		AudioDurationSeconds: &transcription.Duration,
-		HasAudio:             true,
-		Timestamp:            time.Now(),
+		ID:                    userMessageID,
+		ThreadID:              parsedID,
+		Role:                  "user",
+		Content:               transcription.Text,
+		AudioURL:              &userAudioKey,
+		AudioDurationSeconds:  &transcription.Duration,
+		HasAudio:              true,
+		Timestamp:             time.Now(),
+		PronunciationStatus:   "pending",
 	}
 
 	if err := h.DB.Create(&userMessage).Error; err != nil {
 		log.Printf("Error creating user message: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
 		return
+	}
+
+	// Spawn pronunciation analysis in background (non-blocking)
+	if h.PronunciationWorker != nil {
+		go h.PronunciationWorker.AnalyzeAsync(userMessageID, userAudioKey, transcription.Text, "en-us")
 	}
 
 	// Get conversation history
