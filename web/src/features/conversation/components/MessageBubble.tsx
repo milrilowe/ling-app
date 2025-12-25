@@ -1,10 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatMessageTime } from '@/lib/formatting'
 import { cn } from '@/lib/utils'
-import { Volume2 } from 'lucide-react'
+import { Volume2, ChevronDown } from 'lucide-react'
 import { useAudioPlayerContext } from '@/contexts/AudioPlayerContext'
 import { PronunciationDisplay } from './PronunciationDisplay'
 import type { PronunciationAnalysis } from '@/lib/api'
@@ -32,6 +32,10 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const isUser = role === 'user'
   const audioPlayer = useAudioPlayerContext()
+  const [isPronunciationExpanded, setIsPronunciationExpanded] = useState(false)
+
+  // Show chevron when pronunciation is complete
+  const showPronunciationToggle = isUser && hasAudio && pronunciationStatus === 'complete'
 
   // Check if this specific audio is currently loaded
   const isThisAudioLoaded = audioPlayer.currentUrl === audioUrl
@@ -84,12 +88,24 @@ export function MessageBubble({
                 'px-4 py-2 rounded-2xl',
                 isUser
                   ? 'bg-bubble-user text-bubble-user-foreground'
-                  : 'bg-bubble-ai text-bubble-ai-foreground'
+                  : 'bg-bubble-ai text-bubble-ai-foreground',
+                showPronunciationToggle && 'cursor-pointer'
               )}
+              onClick={showPronunciationToggle ? () => setIsPronunciationExpanded(!isPronunciationExpanded) : undefined}
             >
-              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-                {content}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                  {content}
+                </p>
+                {showPronunciationToggle && (
+                  <ChevronDown
+                    className={cn(
+                      'h-3 w-3 shrink-0 opacity-60 transition-transform',
+                      isPronunciationExpanded && 'rotate-180'
+                    )}
+                  />
+                )}
+              </div>
             </div>
 
             {/* Audio controls - show on hover like emoji reactions */}
@@ -128,6 +144,8 @@ export function MessageBubble({
               analysis={pronunciationAnalysis}
               error={pronunciationError}
               expectedText={content}
+              isExpanded={isPronunciationExpanded}
+              onToggleExpand={() => setIsPronunciationExpanded(!isPronunciationExpanded)}
             />
           )}
 

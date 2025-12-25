@@ -8,6 +8,8 @@ interface PronunciationDisplayProps {
   analysis?: PronunciationAnalysis
   error?: string
   expectedText?: string
+  isExpanded?: boolean
+  onToggleExpand?: () => void
 }
 
 type WordStatus = 'correct' | 'partial' | 'wrong' | 'missed'
@@ -81,8 +83,19 @@ function getWordColorClass(status: WordStatus): string {
   }
 }
 
-export function PronunciationDisplay({ status, analysis, error, expectedText }: PronunciationDisplayProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
+export function PronunciationDisplay({
+  status,
+  analysis,
+  error,
+  expectedText,
+  isExpanded: controlledExpanded,
+  onToggleExpand
+}: PronunciationDisplayProps) {
+  const [internalExpanded, setInternalExpanded] = useState(false)
+
+  // Support both controlled and uncontrolled modes
+  const isExpanded = controlledExpanded ?? internalExpanded
+  const toggleExpand = onToggleExpand ?? (() => setInternalExpanded(!internalExpanded))
 
   if (status === 'none') {
     return null
@@ -116,25 +129,15 @@ export function PronunciationDisplay({ status, analysis, error, expectedText }: 
       ? getWordStatuses(expectedText, analysis.phoneme_details)
       : []
 
-    // Collapsed: just show a small icon on the right
+    // Collapsed: return null, chevron is rendered in bubble via renderToggle
     if (!isExpanded) {
-      return (
-        <div className="flex justify-end">
-          <button
-            onClick={() => setIsExpanded(true)}
-            className="px-2 py-1 text-muted-foreground hover:text-foreground transition-colors"
-            title="Show pronunciation"
-          >
-            <ChevronDown className="h-3 w-3" />
-          </button>
-        </div>
-      )
+      return null
     }
 
     // Expanded: show the colored text analysis (click anywhere to collapse)
     return (
       <button
-        onClick={() => setIsExpanded(false)}
+        onClick={toggleExpand}
         className="rounded-2xl bg-muted/50 mt-1 px-4 py-2 text-left transition-colors hover:bg-muted/70 focus:outline-none w-full"
       >
         <p className="text-sm leading-relaxed break-words">
