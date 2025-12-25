@@ -4,16 +4,12 @@ import { useAudioPlayerContext } from '@/contexts/AudioPlayerContext'
 
 interface UsePushToTalkOptions {
   onRecordingComplete?: (audioBlob: Blob) => void
-  onRecordingStart?: () => void
-  onRecordingEnd?: () => void
   triggerKey?: string
   disabled?: boolean
 }
 
 export function usePushToTalk({
   onRecordingComplete,
-  onRecordingStart,
-  onRecordingEnd,
   triggerKey = ' ',
   disabled = false,
 }: UsePushToTalkOptions = {}) {
@@ -35,18 +31,16 @@ export function usePushToTalk({
 
     isHoldingRef.current = true
     audioPlayer.setConversationState('recording')
-    onRecordingStart?.()
     await audioRecorder.startRecording()
-  }, [disabled, audioRecorder, audioPlayer, onRecordingStart])
+  }, [disabled, audioRecorder, audioPlayer])
 
   const stopRecording = useCallback(() => {
     if (!isHoldingRef.current) return
 
     isHoldingRef.current = false
     audioPlayer.setConversationState('idle')
-    onRecordingEnd?.()
     audioRecorder.stopRecording()
-  }, [audioRecorder, audioPlayer, onRecordingEnd])
+  }, [audioRecorder, audioPlayer])
 
   // Keyboard handler (spacebar)
   useEffect(() => {

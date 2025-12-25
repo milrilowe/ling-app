@@ -22,8 +22,6 @@ class EnsembleIPAConverter:
 
     DEFAULT_MODELS = [
         "neurlang/ipa-whisper-small",
-        # Add more models as they become available
-        # "neurlang/ipa-whisper-medium",
     ]
 
     def __init__(

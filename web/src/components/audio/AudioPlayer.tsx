@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -13,8 +13,7 @@ interface AudioPlayerProps {
 }
 
 export function AudioPlayer({ url, className, autoPlay = false }: AudioPlayerProps) {
-  const { isPlaying, isLoading, currentTime, duration, error, play, pause, seek } = useAudioPlayer(url)
-  const [isMuted, setIsMuted] = useState(false)
+  const { isPlaying, isLoading, isMuted, currentTime, duration, error, play, pause, seek, setMuted } = useAudioPlayer(url)
   const hasAutoPlayed = useRef(false)
 
   // Auto-play when component mounts (only once)
@@ -38,7 +37,7 @@ export function AudioPlayer({ url, className, autoPlay = false }: AudioPlayerPro
   }
 
   const toggleMute = () => {
-    setIsMuted(!isMuted)
+    setMuted(!isMuted)
   }
 
   if (error) {

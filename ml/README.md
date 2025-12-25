@@ -520,13 +520,6 @@ This version includes **11 major accuracy improvements** over the baseline:
 
 **For maximum accuracy**: Use ensemble approach (warning: slow)
 
-## Future Enhancements
-
-- **Phase 2**: FastAPI web service wrapper
-- **Phase 3**: Deployment configuration (Docker, etc.)
-- **Phase 4**: Real-time streaming support
-- **Phase 5**: Additional Whisper IPA models (small, medium, large) for ensemble
-
 ## Context: Integration with Main API
 
 This service is part of a larger system:

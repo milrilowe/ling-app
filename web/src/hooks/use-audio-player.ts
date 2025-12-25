@@ -5,6 +5,7 @@ export type ConversationState = 'idle' | 'recording' | 'ai-thinking' | 'ai-speak
 export interface AudioPlayerState {
   isPlaying: boolean
   isLoading: boolean
+  isMuted: boolean
   currentTime: number
   duration: number
   error: string | null
@@ -17,6 +18,7 @@ export interface AudioPlayerActions {
   pause: () => void
   seek: (time: number) => void
   setPlaybackRate: (rate: number) => void
+  setMuted: (muted: boolean) => void
   load: (url: string) => void
   setConversationState: (state: ConversationState) => void
 }
@@ -25,6 +27,7 @@ export function useAudioPlayer(initialUrl?: string) {
   const [state, setState] = useState<AudioPlayerState>({
     isPlaying: false,
     isLoading: false,
+    isMuted: false,
     currentTime: 0,
     duration: 0,
     error: null,
@@ -141,6 +144,13 @@ export function useAudioPlayer(initialUrl?: string) {
     }
   }, [])
 
+  const setMuted = useCallback((muted: boolean) => {
+    if (audioRef.current) {
+      audioRef.current.muted = muted
+      setState(prev => ({ ...prev, isMuted: muted }))
+    }
+  }, [])
+
   const load = useCallback((url: string) => {
     if (audioRef.current && url !== urlRef.current) {
       urlRef.current = url
@@ -160,6 +170,7 @@ export function useAudioPlayer(initialUrl?: string) {
     pause,
     seek,
     setPlaybackRate,
+    setMuted,
     load,
     setConversationState,
   }
