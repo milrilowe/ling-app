@@ -138,7 +138,7 @@ export function PronunciationDisplay({
     return (
       <button
         onClick={toggleExpand}
-        className="rounded-2xl bg-muted/50 mt-1 px-4 py-2 text-left transition-colors hover:bg-muted/70 focus:outline-none w-full"
+        className="rounded-2xl bg-muted/50 mt-1 px-4 py-2 text-left transition-colors hover:bg-muted/70 focus:outline-none w-fit ml-auto"
       >
         <p className="text-sm leading-relaxed break-words">
           {wordStatuses.map((word, idx) => (
