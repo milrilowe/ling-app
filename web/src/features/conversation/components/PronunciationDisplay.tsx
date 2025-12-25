@@ -1,33 +1,99 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Loader2, AlertCircle } from 'lucide-react'
+import { ChevronDown, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { PronunciationAnalysis } from '@/lib/api'
+import type { PronunciationAnalysis, PhonemeDetail } from '@/lib/api'
 
 interface PronunciationDisplayProps {
   status: 'none' | 'pending' | 'complete' | 'failed'
   analysis?: PronunciationAnalysis
   error?: string
+  expectedText?: string
 }
 
-export function PronunciationDisplay({ status, analysis, error }: PronunciationDisplayProps) {
+type WordStatus = 'correct' | 'partial' | 'wrong' | 'missed'
+
+interface WordWithStatus {
+  text: string
+  status: WordStatus
+}
+
+/**
+ * Calculate word-level accuracy from phoneme details.
+ * Maps phonemes back to words and determines each word's status.
+ */
+function getWordStatuses(
+  expectedText: string,
+  phonemeDetails: PhonemeDetail[]
+): WordWithStatus[] {
+  const words = expectedText.split(/\s+/).filter(w => w.length > 0)
+
+  if (words.length === 0 || phonemeDetails.length === 0) {
+    return words.map(text => ({ text, status: 'correct' as WordStatus }))
+  }
+
+  const totalChars = words.reduce((sum, w) => sum + w.replace(/[^\w]/g, '').length, 0)
+  const totalPhonemes = phonemeDetails.filter(p => p.type !== 'insert').length
+
+  let phonemeIndex = 0
+  const result: WordWithStatus[] = []
+
+  for (const word of words) {
+    const wordChars = word.replace(/[^\w]/g, '').length
+    const estimatedPhonemes = Math.max(1, Math.round((wordChars / totalChars) * totalPhonemes))
+    const wordPhonemes = phonemeDetails.slice(phonemeIndex, phonemeIndex + estimatedPhonemes)
+    phonemeIndex += estimatedPhonemes
+
+    const matchCount = wordPhonemes.filter(p => p.type === 'match').length
+    const deleteCount = wordPhonemes.filter(p => p.type === 'delete').length
+
+    let status: WordStatus
+    if (wordPhonemes.length === 0 || deleteCount === wordPhonemes.length) {
+      status = 'missed'
+    } else if (matchCount === wordPhonemes.length) {
+      status = 'correct'
+    } else if (matchCount > 0) {
+      status = 'partial'
+    } else {
+      status = 'wrong'
+    }
+
+    result.push({ text: word, status })
+  }
+
+  return result
+}
+
+/**
+ * Get color class based on word status
+ */
+function getWordColorClass(status: WordStatus): string {
+  switch (status) {
+    case 'correct':
+      return 'text-green-600 dark:text-green-400'
+    case 'partial':
+      return 'text-yellow-600 dark:text-yellow-400'
+    case 'wrong':
+      return 'text-yellow-600 dark:text-yellow-400'
+    case 'missed':
+      return 'text-red-600 dark:text-red-400 line-through'
+    default:
+      return ''
+  }
+}
+
+export function PronunciationDisplay({ status, analysis, error, expectedText }: PronunciationDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // Don't render if no analysis needed
   if (status === 'none') {
     return null
   }
 
-  // Calculate accuracy score
-  const accuracyScore = analysis
-    ? Math.round((analysis.match_count / analysis.phoneme_count) * 100)
-    : 0
-
   // Pending state
   if (status === 'pending') {
     return (
-      <div className="mt-2 flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
+      <div className="flex items-center gap-2 rounded-b-2xl bg-muted/50 px-4 py-2">
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Analyzing pronunciation...</span>
+        <span className="text-xs text-muted-foreground">Analyzing...</span>
       </div>
     )
   }
@@ -35,154 +101,53 @@ export function PronunciationDisplay({ status, analysis, error }: PronunciationD
   // Failed state
   if (status === 'failed') {
     return (
-      <div className="mt-2 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
+      <div className="flex items-center gap-2 rounded-b-2xl bg-destructive/10 px-4 py-2">
         <AlertCircle className="h-4 w-4 text-destructive" />
         <span className="text-xs text-destructive">
-          {error || 'Failed to analyze pronunciation'}
+          {error || 'Analysis failed'}
         </span>
       </div>
     )
   }
 
-  // Complete state - show expandable analysis
+  // Complete state
   if (status === 'complete' && analysis) {
-    return (
-      <div className="mt-2">
-        {/* Collapsed header - always visible */}
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className={cn(
-            'flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors',
-            'border-border/50 bg-muted/30 hover:bg-muted/50',
-            isExpanded && 'rounded-b-none border-b-0'
-          )}
-        >
-          {/* Accuracy indicator bar */}
-          <div
-            className={cn(
-              'h-4 w-1 rounded-full',
-              accuracyScore >= 80 ? 'bg-green-500' :
-              accuracyScore >= 60 ? 'bg-yellow-500' :
-              'bg-red-500'
-            )}
-          />
+    const wordStatuses = expectedText
+      ? getWordStatuses(expectedText, analysis.phoneme_details)
+      : []
 
-          {/* Score badge */}
-          <span
-            className={cn(
-              'rounded-full px-2 py-0.5 text-xs font-medium',
-              accuracyScore >= 80 ? 'bg-green-500/20 text-green-700 dark:text-green-400' :
-              accuracyScore >= 60 ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' :
-              'bg-red-500/20 text-red-700 dark:text-red-400'
-            )}
+    // Collapsed: just show a small icon on the right
+    if (!isExpanded) {
+      return (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="px-2 py-1 text-muted-foreground hover:text-foreground transition-colors"
+            title="Show pronunciation"
           >
-            {accuracyScore}% accuracy
-          </span>
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </div>
+      )
+    }
 
-          <span className="flex-1" />
-
-          {/* Expand/collapse icon */}
-          {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
-
-        {/* Expanded details */}
-        {isExpanded && (
-          <div className="rounded-b-lg border border-t-0 border-border/50 bg-muted/20 px-3 py-3">
-            {/* IPA comparison */}
-            <div className="mb-3 space-y-1">
-              <div className="flex items-baseline gap-2">
-                <span className="text-xs text-muted-foreground w-16">Expected:</span>
-                <span className="font-mono text-sm">{analysis.expected_ipa}</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-xs text-muted-foreground w-16">You said:</span>
-                <span className="font-mono text-sm">{analysis.audio_ipa}</span>
-              </div>
-            </div>
-
-            {/* Phoneme breakdown */}
-            <div className="mb-2">
-              <span className="text-xs text-muted-foreground">Phoneme breakdown:</span>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {analysis.phoneme_details.map((phoneme, idx) => (
-                <PhonemeChip key={idx} phoneme={phoneme} />
-              ))}
-            </div>
-
-            {/* Stats summary */}
-            <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
-              <span>{analysis.match_count} correct</span>
-              {analysis.substitution_count > 0 && (
-                <span className="text-yellow-600 dark:text-yellow-400">
-                  {analysis.substitution_count} substituted
-                </span>
-              )}
-              {analysis.deletion_count > 0 && (
-                <span className="text-red-600 dark:text-red-400">
-                  {analysis.deletion_count} missed
-                </span>
-              )}
-              {analysis.insertion_count > 0 && (
-                <span className="text-blue-600 dark:text-blue-400">
-                  {analysis.insertion_count} extra
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+    // Expanded: show the colored text analysis (click anywhere to collapse)
+    return (
+      <button
+        onClick={() => setIsExpanded(false)}
+        className="rounded-2xl bg-muted/50 mt-1 px-4 py-2 text-left transition-colors hover:bg-muted/70 focus:outline-none w-full"
+      >
+        <p className="text-sm leading-relaxed break-words">
+          {wordStatuses.map((word, idx) => (
+            <span key={idx}>
+              <span className={getWordColorClass(word.status)}>{word.text}</span>
+              {idx < wordStatuses.length - 1 && ' '}
+            </span>
+          ))}
+        </p>
+      </button>
     )
   }
 
   return null
-}
-
-interface PhonemeChipProps {
-  phoneme: {
-    expected: string
-    actual: string
-    type: 'match' | 'substitute' | 'delete' | 'insert'
-  }
-}
-
-function PhonemeChip({ phoneme }: PhonemeChipProps) {
-  const { expected, actual, type } = phoneme
-
-  const baseClasses = 'inline-flex items-center rounded px-1.5 py-0.5 font-mono text-xs'
-
-  switch (type) {
-    case 'match':
-      return (
-        <span className={cn(baseClasses, 'bg-green-500/20 text-green-700 dark:text-green-400')}>
-          {expected}
-        </span>
-      )
-    case 'substitute':
-      return (
-        <span className={cn(baseClasses, 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400')}>
-          <span className="line-through opacity-50">{expected}</span>
-          <span className="mx-0.5">→</span>
-          <span>{actual}</span>
-        </span>
-      )
-    case 'delete':
-      return (
-        <span className={cn(baseClasses, 'bg-red-500/20 text-red-700 dark:text-red-400 line-through')}>
-          {expected}
-        </span>
-      )
-    case 'insert':
-      return (
-        <span className={cn(baseClasses, 'bg-blue-500/20 text-blue-700 dark:text-blue-400')}>
-          +{actual}
-        </span>
-      )
-    default:
-      return null
-  }
 }

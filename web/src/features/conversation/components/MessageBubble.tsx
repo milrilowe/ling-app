@@ -1,3 +1,4 @@
+import React from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -76,11 +77,11 @@ export function MessageBubble({
         </Avatar>
 
         {/* Message bubble */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col w-fit">
           <div className="relative">
             <div
               className={cn(
-                'rounded-2xl px-4 py-2',
+                'px-4 py-2 rounded-2xl',
                 isUser
                   ? 'bg-bubble-user text-bubble-user-foreground'
                   : 'bg-bubble-ai text-bubble-ai-foreground'
@@ -120,24 +121,25 @@ export function MessageBubble({
             )}
           </div>
 
-          {/* Timestamp */}
-          <span
-            className={cn(
-              'text-xs text-muted-foreground',
-              isUser ? 'text-right' : 'text-left'
-            )}
-          >
-            {formatMessageTime(timestamp)}
-          </span>
-
           {/* Pronunciation analysis - only for user audio messages */}
           {isUser && hasAudio && pronunciationStatus && pronunciationStatus !== 'none' && (
             <PronunciationDisplay
               status={pronunciationStatus}
               analysis={pronunciationAnalysis}
               error={pronunciationError}
+              expectedText={content}
             />
           )}
+
+          {/* Timestamp */}
+          <span
+            className={cn(
+              'mt-1 text-xs text-muted-foreground',
+              isUser ? 'text-right' : 'text-left'
+            )}
+          >
+            {formatMessageTime(timestamp)}
+          </span>
         </div>
       </div>
     </div>
