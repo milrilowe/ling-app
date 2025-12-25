@@ -72,7 +72,7 @@ func (w *PronunciationWorker) AnalyzeAsync(messageID uuid.UUID, audioKey, expect
 		return
 	}
 
-	// Convert analysis to JSON
+	// Convert analysis to JSONMap for proper serialization
 	analysisJSON, err := json.Marshal(result.Analysis)
 	if err != nil {
 		log.Printf("[PronunciationWorker] Failed to marshal analysis: %v", err)
@@ -80,14 +80,20 @@ func (w *PronunciationWorker) AnalyzeAsync(messageID uuid.UUID, audioKey, expect
 		return
 	}
 
+	var analysisMap models.JSONMap
+	if err := json.Unmarshal(analysisJSON, &analysisMap); err != nil {
+		log.Printf("[PronunciationWorker] Failed to unmarshal analysis to map: %v", err)
+		w.markFailed(messageID, "JSON_ERROR", err.Error())
+		return
+	}
+
 	// Update message with results
 	now := time.Now()
-	analysisStr := string(analysisJSON)
 	err = w.DB.Model(&models.Message{}).
 		Where("id = ?", messageID).
 		Updates(map[string]interface{}{
 			"pronunciation_status":     "complete",
-			"pronunciation_analysis":   analysisStr,
+			"pronunciation_analysis":   analysisMap,
 			"pronunciation_error":      nil,
 			"pronunciation_updated_at": now,
 		}).Error

@@ -130,15 +130,21 @@ async def analyze_pronunciation(request: PronunciationRequest) -> PronunciationR
         expected_ipa = text_converter.text_to_ipa(request.expected_text)
         print(f"[DEBUG] Gruut expected_ipa: '{expected_ipa}'")
 
-        # 4. Align phonemes
-        # Debug: show extracted phonemes
+        # 4. Align phonemes (normalizer handles tie bars, prosodic markers, etc.)
+        # Debug: show extracted phonemes after normalization
         audio_phonemes = aligner.extract_phonemes(audio_ipa)
         expected_phonemes = aligner.extract_phonemes(expected_ipa)
         print(f"[DEBUG] Audio phonemes ({len(audio_phonemes)}): {audio_phonemes}")
         print(f"[DEBUG] Expected phonemes ({len(expected_phonemes)}): {expected_phonemes}")
 
         alignment = aligner.align(audio_ipa, expected_ipa)
-        print(f"[DEBUG] Alignment: {alignment}")
+
+        # Pretty print alignment
+        matches = sum(1 for _, _, t in alignment if t == "match")
+        print(f"[DEBUG] Alignment ({matches}/{len(alignment)} matches):")
+        for exp, act, typ in alignment:
+            symbol = "✓" if typ == "match" else "✗" if typ == "substitute" else "−" if typ == "delete" else "+"
+            print(f"  {symbol} expected='{exp}' actual='{act}' ({typ})")
 
         # 5. Count statistics
         match_count = sum(1 for _, _, t in alignment if t == "match")

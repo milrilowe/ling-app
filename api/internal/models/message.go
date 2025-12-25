@@ -1,11 +1,41 @@
 package models
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+// JSONMap is a custom type that stores as JSONB in PostgreSQL but serializes
+// as a JSON object (not a string) in API responses
+type JSONMap map[string]interface{}
+
+// Scan implements sql.Scanner for reading from the database
+func (j *JSONMap) Scan(value interface{}) error {
+	if value == nil {
+		*j = nil
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(bytes, j)
+}
+
+// Value implements driver.Valuer for writing to the database
+func (j JSONMap) Value() (driver.Value, error) {
+	if j == nil {
+		return nil, nil
+	}
+	return json.Marshal(j)
+}
 
 type Message struct {
 	ID                   uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
@@ -18,9 +48,9 @@ type Message struct {
 	Timestamp            time.Time `json:"timestamp"`
 
 	// Pronunciation analysis fields
-	PronunciationStatus    string     `gorm:"type:varchar(20);default:'none'" json:"pronunciationStatus"`        // "none", "pending", "complete", "failed"
-	PronunciationAnalysis  *string    `gorm:"type:jsonb" json:"pronunciationAnalysis,omitempty"`                 // Full analysis JSON
-	PronunciationError     *string    `gorm:"type:text" json:"pronunciationError,omitempty"`                     // Error message if failed
+	PronunciationStatus    string     `gorm:"type:varchar(20);default:'none'" json:"pronunciationStatus"` // "none", "pending", "complete", "failed"
+	PronunciationAnalysis  JSONMap    `gorm:"type:jsonb" json:"pronunciationAnalysis,omitempty"`          // Full analysis JSON object
+	PronunciationError     *string    `gorm:"type:text" json:"pronunciationError,omitempty"`              // Error message if failed
 	PronunciationUpdatedAt *time.Time `json:"pronunciationUpdatedAt,omitempty"`
 }
 
