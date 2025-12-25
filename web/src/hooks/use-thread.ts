@@ -42,9 +42,21 @@ export function useCreateThread() {
 }
 
 export function useThread(threadId: string) {
+  const query = useQuery({
+    queryKey: threadKeys.detail(threadId),
+    queryFn: () => getThread(threadId),
+  })
+
+  // Check if any message has pending pronunciation analysis
+  const hasPendingAnalysis = query.data?.messages?.some(
+    (m) => m.pronunciationStatus === 'pending'
+  )
+
+  // Poll every 5 seconds if there's a pending analysis
   return useQuery({
     queryKey: threadKeys.detail(threadId),
     queryFn: () => getThread(threadId),
+    refetchInterval: hasPendingAnalysis ? 5000 : false,
   })
 }
 

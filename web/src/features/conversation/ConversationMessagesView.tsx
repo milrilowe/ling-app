@@ -47,6 +47,9 @@ export function ConversationMessagesView({ threadId }: ConversationMessagesViewP
             timestamp={message.timestamp}
             audioUrl={message.audioUrl}
             hasAudio={message.hasAudio}
+            pronunciationStatus={message.pronunciationStatus}
+            pronunciationAnalysis={message.pronunciationAnalysis}
+            pronunciationError={message.pronunciationError}
           />
         ))}
       </div>

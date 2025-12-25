@@ -5,6 +5,8 @@ import { formatMessageTime } from '@/lib/formatting'
 import { cn } from '@/lib/utils'
 import { Volume2 } from 'lucide-react'
 import { useAudioPlayerContext } from '@/contexts/AudioPlayerContext'
+import { PronunciationDisplay } from './PronunciationDisplay'
+import type { PronunciationAnalysis } from '@/lib/api'
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant'
@@ -12,9 +14,21 @@ interface MessageBubbleProps {
   timestamp: string | Date
   audioUrl?: string
   hasAudio?: boolean
+  pronunciationStatus?: 'none' | 'pending' | 'complete' | 'failed'
+  pronunciationAnalysis?: PronunciationAnalysis
+  pronunciationError?: string
 }
 
-export function MessageBubble({ role, content, timestamp, audioUrl, hasAudio }: MessageBubbleProps) {
+export function MessageBubble({
+  role,
+  content,
+  timestamp,
+  audioUrl,
+  hasAudio,
+  pronunciationStatus,
+  pronunciationAnalysis,
+  pronunciationError,
+}: MessageBubbleProps) {
   const isUser = role === 'user'
   const audioPlayer = useAudioPlayerContext()
 
@@ -115,6 +129,15 @@ export function MessageBubble({ role, content, timestamp, audioUrl, hasAudio }: 
           >
             {formatMessageTime(timestamp)}
           </span>
+
+          {/* Pronunciation analysis - only for user audio messages */}
+          {isUser && hasAudio && pronunciationStatus && pronunciationStatus !== 'none' && (
+            <PronunciationDisplay
+              status={pronunciationStatus}
+              analysis={pronunciationAnalysis}
+              error={pronunciationError}
+            />
+          )}
         </div>
       </div>
     </div>

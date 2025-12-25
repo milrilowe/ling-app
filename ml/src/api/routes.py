@@ -109,11 +109,16 @@ async def analyze_pronunciation(request: PronunciationRequest) -> PronunciationR
         # 2. Convert audio to IPA
         # Extract language code for Whisper (e.g., 'en' from 'en-us')
         whisper_lang = request.language.split("-")[0] if "-" in request.language else request.language
+        print(f"[DEBUG] Audio array shape: {audio_array.shape}, sample_rate: {sample_rate}")
+        print(f"[DEBUG] Audio duration: {len(audio_array) / sample_rate:.2f}s")
+        print(f"[DEBUG] Expected text: '{request.expected_text}'")
+
         audio_ipa = whisper_converter.audio_to_ipa(
             audio_array,
             sample_rate,
             language=whisper_lang
         )
+        print(f"[DEBUG] Whisper audio_ipa: '{audio_ipa}'")
 
         # 3. Convert expected text to IPA
         # Create a new converter if language differs from default
@@ -123,9 +128,17 @@ async def analyze_pronunciation(request: PronunciationRequest) -> PronunciationR
             text_converter = gruut_converter
 
         expected_ipa = text_converter.text_to_ipa(request.expected_text)
+        print(f"[DEBUG] Gruut expected_ipa: '{expected_ipa}'")
 
         # 4. Align phonemes
+        # Debug: show extracted phonemes
+        audio_phonemes = aligner.extract_phonemes(audio_ipa)
+        expected_phonemes = aligner.extract_phonemes(expected_ipa)
+        print(f"[DEBUG] Audio phonemes ({len(audio_phonemes)}): {audio_phonemes}")
+        print(f"[DEBUG] Expected phonemes ({len(expected_phonemes)}): {expected_phonemes}")
+
         alignment = aligner.align(audio_ipa, expected_ipa)
+        print(f"[DEBUG] Alignment: {alignment}")
 
         # 5. Count statistics
         match_count = sum(1 for _, _, t in alignment if t == "match")

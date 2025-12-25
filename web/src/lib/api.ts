@@ -44,6 +44,25 @@ async function callAPI<T>(
   }
 }
 
+export interface PhonemeDetail {
+  expected: string
+  actual: string
+  type: 'match' | 'substitute' | 'delete' | 'insert'
+  position: number
+}
+
+export interface PronunciationAnalysis {
+  audio_ipa: string
+  expected_ipa: string
+  phoneme_count: number
+  match_count: number
+  substitution_count: number
+  deletion_count: number
+  insertion_count: number
+  phoneme_details: PhonemeDetail[]
+  processing_time_ms: number
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -52,6 +71,9 @@ export interface Message {
   audioUrl?: string
   audioDurationSeconds?: number
   hasAudio?: boolean
+  pronunciationStatus?: 'none' | 'pending' | 'complete' | 'failed'
+  pronunciationAnalysis?: PronunciationAnalysis
+  pronunciationError?: string
 }
 
 export interface Thread {
