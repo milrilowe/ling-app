@@ -20,6 +20,7 @@ async function callAPI<T>(
   try {
     const response = await fetch(url, {
       ...options,
+      credentials: 'include', // Send cookies with requests
       headers: {
         'Content-Type': 'application/json',
         ...options?.headers,
@@ -29,7 +30,7 @@ async function callAPI<T>(
     if (!response.ok) {
       const errorData = await response.json().catch(() => null)
       throw new ApiError(
-        errorData?.message || `API error: ${response.status}`,
+        errorData?.error || errorData?.message || `API error: ${response.status}`,
         response.status,
         errorData
       )
@@ -155,6 +156,7 @@ export async function sendAudioMessage(
     const response = await fetch(url, {
       method: 'POST',
       body: formData,
+      credentials: 'include', // Send cookies with requests
     })
 
     if (!response.ok) {
@@ -197,6 +199,60 @@ export async function sendAudioMessage(
 export async function getAudioUrl(audioKey: string): Promise<string> {
   const response = await callAPI<{ url: string }>(`/api/audio/${audioKey}`)
   return response.url
+}
+
+// ============================================
+// Auth API
+// ============================================
+
+export interface User {
+  id: string
+  email: string
+  name: string
+  avatarUrl?: string
+  emailVerified: boolean
+}
+
+interface RegisterRequest {
+  email: string
+  password: string
+  name: string
+}
+
+interface LoginRequest {
+  email: string
+  password: string
+}
+
+export async function register(data: RegisterRequest): Promise<User> {
+  return callAPI<User>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function login(data: LoginRequest): Promise<User> {
+  return callAPI<User>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function logout(): Promise<void> {
+  await callAPI<{ message: string }>('/api/auth/logout', {
+    method: 'POST',
+  })
+}
+
+export async function getCurrentUser(): Promise<User | null> {
+  try {
+    return await callAPI<User>('/api/auth/me')
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      return null // Not authenticated
+    }
+    throw error
+  }
 }
 
 export { ApiError }

@@ -22,6 +22,15 @@ type Config struct {
 	SessionSecret string
 	SessionMaxAge int
 
+	// OAuth
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleRedirectURL  string
+	GitHubClientID     string
+	GitHubClientSecret string
+	GitHubRedirectURL  string
+	FrontendURL        string // Where to redirect after OAuth
+
 	// ML Service
 	MLServiceURL     string
 	MLServiceTimeout int // timeout in seconds for ML service calls
@@ -62,6 +71,14 @@ func Load() *Config {
 
 		SessionSecret: getEnv("SESSION_SECRET", ""),
 		SessionMaxAge: 86400, // 24 hours
+
+		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURL:  getEnv("GOOGLE_REDIRECT_URL", "http://localhost:8080/api/auth/google/callback"),
+		GitHubClientID:     getEnv("GITHUB_CLIENT_ID", ""),
+		GitHubClientSecret: getEnv("GITHUB_CLIENT_SECRET", ""),
+		GitHubRedirectURL:  getEnv("GITHUB_REDIRECT_URL", "http://localhost:8080/api/auth/github/callback"),
+		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:3000"),
 
 		MLServiceURL:     getEnv("ML_SERVICE_URL", "http://localhost:8000"),
 		MLServiceTimeout: 120, // 2 minutes for pronunciation analysis

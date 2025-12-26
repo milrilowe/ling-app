@@ -27,11 +27,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Run migrations
-	if err := database.RunMigrations(&models.Thread{}, &models.Message{}); err != nil {
+	// Run migrations (order matters for foreign keys)
+	if err := database.RunMigrations(
+		&models.User{},
+		&models.Session{},
+		&models.Thread{},
+		&models.Message{},
+	); err != nil {
 		log.Fatal("Failed to run migrations:", err)
 		os.Exit(1)
 	}
+
+	// Initialize auth services
+	authService := services.NewAuthService(database, cfg.SessionMaxAge)
+	oauthService := services.NewOAuthService(cfg)
 
 	// Initialize storage service
 	storageService, err := services.NewStorageService(
@@ -67,6 +76,7 @@ func main() {
 	pronunciationWorker := services.NewPronunciationWorker(database, mlClient, storageService)
 
 	// Initialize handlers
+	authHandler := handlers.NewAuthHandler(authService, oauthService, cfg)
 	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, elevenLabsClient, pronunciationWorker)
 	audioHandler := handlers.NewAudioHandler(storageService)
 
@@ -85,18 +95,38 @@ func main() {
 	// API routes
 	api := router.Group("/api")
 	{
-		// Prompts
+		// Public routes (no auth required)
 		api.GET("/prompts/random", handlers.GetRandomPrompt)
 
-		// Threads
-		api.GET("/threads", threadHandler.GetThreads)
-		api.POST("/threads", threadHandler.CreateThread)
-		api.GET("/threads/:id", threadHandler.GetThread)
-		api.POST("/threads/:id/messages", threadHandler.SendMessage)
-		api.POST("/threads/:id/messages/audio", threadHandler.SendAudioMessage)
+		// Auth routes
+		auth := api.Group("/auth")
+		{
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
+			auth.POST("/logout", authHandler.Logout)
+			// /me requires authentication
+			auth.GET("/me", middleware.RequireAuth(authService), authHandler.GetMe)
+			// OAuth routes
+			auth.GET("/google", authHandler.GoogleLogin)
+			auth.GET("/google/callback", authHandler.GoogleCallback)
+			auth.GET("/github", authHandler.GitHubLogin)
+			auth.GET("/github/callback", authHandler.GitHubCallback)
+		}
 
-		// Audio - use *key to capture full path including slashes
-		api.GET("/audio/*key", audioHandler.GetAudio)
+		// Protected routes (require authentication)
+		protected := api.Group("")
+		protected.Use(middleware.RequireAuth(authService))
+		{
+			// Threads
+			protected.GET("/threads", threadHandler.GetThreads)
+			protected.POST("/threads", threadHandler.CreateThread)
+			protected.GET("/threads/:id", threadHandler.GetThread)
+			protected.POST("/threads/:id/messages", threadHandler.SendMessage)
+			protected.POST("/threads/:id/messages/audio", threadHandler.SendAudioMessage)
+
+			// Audio - use *key to capture full path including slashes
+			protected.GET("/audio/*key", audioHandler.GetAudio)
+		}
 	}
 
 	// Start server

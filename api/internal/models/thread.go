@@ -9,6 +9,7 @@ import (
 
 type Thread struct {
 	ID        uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid;index;not null" json:"-"` // Owner of the thread
 	Messages  []Message `gorm:"foreignKey:ThreadID;constraint:OnDelete:CASCADE" json:"messages"`
 	CreatedAt time.Time `json:"createdAt"`
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ling-app/api/internal/db"
+	"ling-app/api/internal/middleware"
 	"ling-app/api/internal/models"
 	"ling-app/api/internal/services"
 
@@ -45,10 +46,13 @@ type SendMessageRequest struct {
 	Content string `json:"content"`
 }
 
-// GetThreads retrieves all threads, ordered by most recent
+// GetThreads retrieves all threads for the current user, ordered by most recent
 func (h *ThreadHandler) GetThreads(c *gin.Context) {
+	// Get current user from context (set by RequireAuth middleware)
+	user := middleware.MustGetUser(c)
+
 	var threads []models.Thread
-	if err := h.DB.Order("created_at DESC").Find(&threads).Error; err != nil {
+	if err := h.DB.Where("user_id = ?", user.ID).Order("created_at DESC").Find(&threads).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch threads"})
 		return
 	}
@@ -57,6 +61,9 @@ func (h *ThreadHandler) GetThreads(c *gin.Context) {
 
 // CreateThread creates a new conversation thread
 func (h *ThreadHandler) CreateThread(c *gin.Context) {
+	// Get current user from context
+	user := middleware.MustGetUser(c)
+
 	var req CreateThreadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -65,6 +72,7 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 
 	thread := models.Thread{
 		ID:        uuid.New(),
+		UserID:    user.ID, // Associate thread with user
 		CreatedAt: time.Now(),
 	}
 
@@ -153,8 +161,9 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 	c.JSON(http.StatusOK, thread)
 }
 
-// GetThread retrieves a thread with all messages
+// GetThread retrieves a thread with all messages (only if owned by current user)
 func (h *ThreadHandler) GetThread(c *gin.Context) {
+	user := middleware.MustGetUser(c)
 	threadID := c.Param("id")
 
 	parsedID, err := uuid.Parse(threadID)
@@ -164,7 +173,8 @@ func (h *ThreadHandler) GetThread(c *gin.Context) {
 	}
 
 	var thread models.Thread
-	if err := h.DB.Preload("Messages").First(&thread, parsedID).Error; err != nil {
+	// Only fetch if thread belongs to current user
+	if err := h.DB.Preload("Messages").Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
 		return
 	}
@@ -174,6 +184,7 @@ func (h *ThreadHandler) GetThread(c *gin.Context) {
 
 // SendMessage sends a user message and gets AI response
 func (h *ThreadHandler) SendMessage(c *gin.Context) {
+	user := middleware.MustGetUser(c)
 	threadID := c.Param("id")
 	parsedID, err := uuid.Parse(threadID)
 	if err != nil {
@@ -187,9 +198,9 @@ func (h *ThreadHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	// Check if thread exists
+	// Check if thread exists and belongs to current user
 	var thread models.Thread
-	if err := h.DB.First(&thread, parsedID).Error; err != nil {
+	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
 		return
 	}
@@ -255,6 +266,7 @@ func (h *ThreadHandler) SendMessage(c *gin.Context) {
 // SendAudioMessage handles audio message upload, transcription, AI response, and TTS
 // POST /api/threads/:id/messages/audio
 func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
+	user := middleware.MustGetUser(c)
 	threadID := c.Param("id")
 	parsedID, err := uuid.Parse(threadID)
 	if err != nil {
@@ -262,9 +274,9 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 		return
 	}
 
-	// Check if thread exists
+	// Check if thread exists and belongs to current user
 	var thread models.Thread
-	if err := h.DB.First(&thread, parsedID).Error; err != nil {
+	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
 		return
 	}
