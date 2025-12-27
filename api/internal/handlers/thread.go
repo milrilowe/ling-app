@@ -25,9 +25,10 @@ type ThreadHandler struct {
 	ElevenLabsClient    *services.ElevenLabsClient
 	PronunciationWorker *services.PronunciationWorker
 	CreditsService      *services.CreditsService
+	MaxAudioFileSize    int64
 }
 
-func NewThreadHandler(database *db.DB, openAIClient *services.OpenAIClient, storage *services.StorageService, whisper *services.WhisperClient, elevenlabs *services.ElevenLabsClient, pronunciationWorker *services.PronunciationWorker, creditsService *services.CreditsService) *ThreadHandler {
+func NewThreadHandler(database *db.DB, openAIClient *services.OpenAIClient, storage *services.StorageService, whisper *services.WhisperClient, elevenlabs *services.ElevenLabsClient, pronunciationWorker *services.PronunciationWorker, creditsService *services.CreditsService, maxAudioFileSize int64) *ThreadHandler {
 	return &ThreadHandler{
 		DB:                  database,
 		OpenAIClient:        openAIClient,
@@ -36,6 +37,7 @@ func NewThreadHandler(database *db.DB, openAIClient *services.OpenAIClient, stor
 		ElevenLabsClient:    elevenlabs,
 		PronunciationWorker: pronunciationWorker,
 		CreditsService:      creditsService,
+		MaxAudioFileSize:    maxAudioFileSize,
 	}
 }
 
@@ -44,9 +46,6 @@ type CreateThreadRequest struct {
 	FirstUserMessage string `json:"firstUserMessage"`
 }
 
-type SendMessageRequest struct {
-	Content string `json:"content"`
-}
 
 // GetThreads retrieves all threads for the current user, ordered by most recent
 func (h *ThreadHandler) GetThreads(c *gin.Context) {
@@ -184,97 +183,6 @@ func (h *ThreadHandler) GetThread(c *gin.Context) {
 	c.JSON(http.StatusOK, thread)
 }
 
-// SendMessage sends a user message and gets AI response
-func (h *ThreadHandler) SendMessage(c *gin.Context) {
-	user := middleware.MustGetUser(c)
-	threadID := c.Param("id")
-	parsedID, err := uuid.Parse(threadID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid thread ID"})
-		return
-	}
-
-	var req SendMessageRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Check if thread exists and belongs to current user
-	var thread models.Thread
-	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
-		return
-	}
-
-	// Save user message
-	userMessage := models.Message{
-		ID:        uuid.New(),
-		ThreadID:  parsedID,
-		Role:      "user",
-		Content:   req.Content,
-		Timestamp: time.Now(),
-	}
-
-	if err := h.DB.Create(&userMessage).Error; err != nil {
-		log.Printf("Error creating user message: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
-		return
-	}
-
-	// Get conversation history
-	var messages []models.Message
-	if err := h.DB.Where("thread_id = ?", parsedID).Order("timestamp ASC").Find(&messages).Error; err != nil {
-		log.Printf("Error fetching messages: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
-		return
-	}
-
-	// Convert to ML format
-	conversationHistory := make([]services.ConversationMessage, len(messages))
-	for i, msg := range messages {
-		conversationHistory[i] = services.ConversationMessage{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
-	}
-
-	// Generate AI response
-	aiResponse, err := h.OpenAIClient.Generate(conversationHistory)
-	if err != nil {
-		log.Printf("Error generating AI response: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate response"})
-		return
-	}
-
-	// Save AI response
-	responseMessage := models.Message{
-		ID:        uuid.New(),
-		ThreadID:  parsedID,
-		Role:      "assistant",
-		Content:   aiResponse,
-		Timestamp: time.Now(),
-	}
-
-	if err := h.DB.Create(&responseMessage).Error; err != nil {
-		log.Printf("Error creating AI response: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
-		return
-	}
-
-	// Deduct credits for text message
-	if h.CreditsService != nil {
-		cost := middleware.GetCreditsCost(c)
-		if cost > 0 {
-			if err := h.CreditsService.DeductCredits(user.ID, cost, responseMessage.ID.String(), "Text message"); err != nil {
-				log.Printf("Failed to deduct credits: %v", err)
-			}
-		}
-	}
-
-	c.JSON(http.StatusOK, responseMessage)
-}
-
 // SendAudioMessage handles audio message upload, transcription, AI response, and TTS
 // POST /api/threads/:id/messages/audio
 func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
@@ -300,6 +208,15 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 		return
 	}
 	defer file.Close()
+
+	// Validate file size
+	if h.MaxAudioFileSize > 0 && fileHeader.Size > h.MaxAudioFileSize {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error":   "Audio file too large",
+			"maxSize": h.MaxAudioFileSize,
+		})
+		return
+	}
 
 	// Create user message ID
 	userMessageID := uuid.New()
@@ -455,12 +372,15 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 		return
 	}
 
-	// Deduct credits for audio message
+	// Deduct credits for voice message
 	if h.CreditsService != nil {
 		cost := middleware.GetCreditsCost(c)
 		if cost > 0 {
-			if err := h.CreditsService.DeductCredits(user.ID, cost, responseMessage.ID.String(), "Audio message"); err != nil {
-				log.Printf("Failed to deduct credits: %v", err)
+			if err := h.CreditsService.DeductCredits(user.ID, cost, responseMessage.ID.String(), "Voice message"); err != nil {
+				// Credit deduction failed - this is a billing issue that needs attention
+				// The message was already processed, so we return it but log the error prominently
+				log.Printf("CRITICAL: Failed to deduct credits for user %s, message %s: %v", user.ID, responseMessage.ID, err)
+				// Still return success since the message was processed - but this needs monitoring
 			}
 		}
 	}

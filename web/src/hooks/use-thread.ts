@@ -45,19 +45,16 @@ export function useThread(threadId: string) {
   const query = useQuery({
     queryKey: threadKeys.detail(threadId),
     queryFn: () => getThread(threadId),
+    // Poll every 5 seconds if there's a pending pronunciation analysis
+    refetchInterval: (query) => {
+      const hasPendingAnalysis = query.state.data?.messages?.some(
+        (m) => m.pronunciationStatus === 'pending'
+      )
+      return hasPendingAnalysis ? 5000 : false
+    },
   })
 
-  // Check if any message has pending pronunciation analysis
-  const hasPendingAnalysis = query.data?.messages?.some(
-    (m) => m.pronunciationStatus === 'pending'
-  )
-
-  // Poll every 5 seconds if there's a pending analysis
-  return useQuery({
-    queryKey: threadKeys.detail(threadId),
-    queryFn: () => getThread(threadId),
-    refetchInterval: hasPendingAnalysis ? 5000 : false,
-  })
+  return query
 }
 
 export function useSendMessage(threadId: string) {

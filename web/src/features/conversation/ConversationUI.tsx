@@ -16,14 +16,14 @@ interface LocationState {
   audioUrl?: string
 }
 
-// Track which threads have had their audio played across component mounts
-const playedAudioThreads = new Set<string>()
-
 export function ConversationUI({ threadId }: ConversationUIProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const createThreadMutation = useCreateThread()
   const audioPlayer = useAudioPlayerContext()
+
+  // Track if we've already played audio for this thread (per-mount, not global)
+  const playedAudioRef = useRef<string | null>(null)
 
   // Only use audio pipeline if we have a threadId
   const audioPipelineResult = threadId
@@ -40,9 +40,9 @@ export function ConversationUI({ threadId }: ConversationUIProps) {
   // Only play audio when we first navigate to a thread with audio
   useEffect(() => {
     const locationState = location.state as LocationState | undefined
-    if (threadId && locationState?.audioUrl && !playedAudioThreads.has(threadId)) {
+    if (threadId && locationState?.audioUrl && playedAudioRef.current !== threadId) {
       // We just navigated here with audio to play
-      playedAudioThreads.add(threadId)
+      playedAudioRef.current = threadId
       audioPlayer.load(locationState.audioUrl)
       setTimeout(() => {
         audioPlayer.play()

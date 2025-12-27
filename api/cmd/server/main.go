@@ -90,7 +90,7 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, oauthService, cfg)
-	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, elevenLabsClient, pronunciationWorker, creditsService)
+	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, elevenLabsClient, pronunciationWorker, creditsService, cfg.MaxAudioFileSize)
 	audioHandler := handlers.NewAudioHandler(storageService)
 	subscriptionHandler := handlers.NewSubscriptionHandler(stripeService, creditsService)
 	phonemeStatsHandler := handlers.NewPhonemeStatsHandler(phonemeStatsService)
@@ -136,12 +136,9 @@ func main() {
 			protected.GET("/threads", threadHandler.GetThreads)
 			protected.POST("/threads", threadHandler.CreateThread)
 			protected.GET("/threads/:id", threadHandler.GetThread)
-			// Messages - with credit enforcement
-			protected.POST("/threads/:id/messages",
-				middleware.RequireCredits(creditsService, models.CreditCostTextMessage),
-				threadHandler.SendMessage)
+			// Voice message - with credit enforcement (1 credit per voice submission)
 			protected.POST("/threads/:id/messages/audio",
-				middleware.RequireCredits(creditsService, models.CreditCostAudioMessage),
+				middleware.RequireCredits(creditsService, models.CreditCostPerMessage),
 				threadHandler.SendAudioMessage)
 
 			// Audio - use *key to capture full path including slashes

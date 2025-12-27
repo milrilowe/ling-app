@@ -7,11 +7,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Credit costs for different operations
-const (
-	CreditCostTextMessage  = 1
-	CreditCostAudioMessage = 5
-)
+// Credit cost per voice message (only input type in this pronunciation app)
+const CreditCostPerMessage = 1
 
 // Credits tracks a user's credit balance
 type Credits struct {
