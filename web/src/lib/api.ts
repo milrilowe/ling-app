@@ -4,17 +4,14 @@ class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public data?: unknown
+    public data?: unknown,
   ) {
     super(message)
     this.name = 'ApiError'
   }
 }
 
-async function callAPI<T>(
-  endpoint: string,
-  options?: RequestInit
-): Promise<T> {
+async function callAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
 
   try {
@@ -30,9 +27,11 @@ async function callAPI<T>(
     if (!response.ok) {
       const errorData = await response.json().catch(() => null)
       throw new ApiError(
-        errorData?.error || errorData?.message || `API error: ${response.status}`,
+        errorData?.error ||
+          errorData?.message ||
+          `API error: ${response.status}`,
         response.status,
-        errorData
+        errorData,
       )
     }
 
@@ -64,6 +63,16 @@ export interface PronunciationAnalysis {
   processing_time_ms: number
 }
 
+export interface WordTiming {
+  word: string
+  start: number
+  end: number
+}
+
+export interface WordTimings {
+  words: WordTiming[]
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -75,6 +84,9 @@ export interface Message {
   pronunciationStatus?: 'none' | 'pending' | 'complete' | 'failed'
   pronunciationAnalysis?: PronunciationAnalysis
   pronunciationError?: string
+  wordTimings?: WordTimings
+  wordTimingsStatus?: 'none' | 'pending' | 'complete' | 'failed'
+  wordTimingsError?: string
 }
 
 export interface Thread {
@@ -93,7 +105,9 @@ export async function getRandomPrompt(): Promise<string> {
   return response.prompt
 }
 
-export async function createThread(request?: CreateThreadRequest): Promise<Thread> {
+export async function createThread(
+  request?: CreateThreadRequest,
+): Promise<Thread> {
   return callAPI<Thread>('/api/threads', {
     method: 'POST',
     body: request ? JSON.stringify(request) : undefined,
@@ -113,11 +127,15 @@ export async function getThread(threadId: string): Promise<Thread> {
             // We need to fetch the presigned URL from MinIO
             message.audioUrl = await getAudioUrl(message.audioUrl)
           } catch (error) {
-            console.error('Failed to fetch audio URL for message:', message.id, error)
+            console.error(
+              'Failed to fetch audio URL for message:',
+              message.id,
+              error,
+            )
             // Keep the original key if fetching fails
           }
         }
-      })
+      }),
     )
   }
 
@@ -126,7 +144,7 @@ export async function getThread(threadId: string): Promise<Thread> {
 
 export async function sendMessage(
   threadId: string,
-  content: string
+  content: string,
 ): Promise<Message> {
   return callAPI<Message>(`/api/threads/${threadId}/messages`, {
     method: 'POST',
@@ -145,7 +163,7 @@ export interface SendAudioMessageResponse {
 
 export async function sendAudioMessage(
   threadId: string,
-  audioBlob: Blob
+  audioBlob: Blob,
 ): Promise<SendAudioMessageResponse> {
   const formData = new FormData()
   formData.append('audio', audioBlob, 'recording.webm')
@@ -164,7 +182,7 @@ export async function sendAudioMessage(
       throw new ApiError(
         errorData?.error || `API error: ${response.status}`,
         response.status,
-        errorData
+        errorData,
       )
     }
 
@@ -181,7 +199,9 @@ export async function sendAudioMessage(
 
     if (data.assistantMessage.hasAudio && data.assistantMessage.audioUrl) {
       try {
-        data.assistantMessage.audioUrl = await getAudioUrl(data.assistantMessage.audioUrl)
+        data.assistantMessage.audioUrl = await getAudioUrl(
+          data.assistantMessage.audioUrl,
+        )
       } catch (error) {
         console.error('Failed to fetch assistant audio URL:', error)
       }
@@ -253,6 +273,131 @@ export async function getCurrentUser(): Promise<User | null> {
     }
     throw error
   }
+}
+
+// ============================================
+// Subscription & Credits API
+// ============================================
+
+export type SubscriptionTier = 'free' | 'basic' | 'pro'
+
+export interface Subscription {
+  id: string
+  tier: SubscriptionTier
+  status: 'active' | 'canceled' | 'past_due'
+  currentPeriodStart?: string
+  currentPeriodEnd?: string
+  cancelAtPeriodEnd: boolean
+}
+
+export interface Credits {
+  id: string
+  balance: number
+  monthlyAllowance: number
+  usedThisPeriod: number
+  lastRefreshedAt: string
+}
+
+export interface SubscriptionWithCredits {
+  subscription: Subscription
+  credits: Credits
+}
+
+export interface CreditTransaction {
+  id: string
+  type: 'debit' | 'credit' | 'refresh'
+  amount: number
+  balanceAfter: number
+  reference?: string
+  description: string
+  createdAt: string
+}
+
+export interface CheckoutResponse {
+  url: string
+}
+
+export interface PortalResponse {
+  url: string
+}
+
+export async function getSubscriptionStatus(): Promise<SubscriptionWithCredits> {
+  return callAPI<SubscriptionWithCredits>('/api/subscription')
+}
+
+export async function getCredits(): Promise<Credits> {
+  return callAPI<Credits>('/api/credits')
+}
+
+export async function getCreditHistory(): Promise<{
+  transactions: CreditTransaction[]
+}> {
+  return callAPI<{ transactions: CreditTransaction[] }>('/api/credits/history')
+}
+
+export async function createCheckoutSession(
+  tier: 'basic' | 'pro',
+): Promise<CheckoutResponse> {
+  return callAPI<CheckoutResponse>('/api/subscription/checkout', {
+    method: 'POST',
+    body: JSON.stringify({ tier }),
+  })
+}
+
+export async function createPortalSession(): Promise<PortalResponse> {
+  return callAPI<PortalResponse>('/api/subscription/portal', {
+    method: 'POST',
+  })
+}
+
+// Credit costs (should match backend)
+export const CREDIT_COSTS = {
+  textMessage: 1,
+  audioMessage: 5,
+} as const
+
+// Tier info for display
+export const TIER_INFO = {
+  free: { name: 'Free', price: 0, credits: 20 },
+  basic: { name: 'Basic', price: 20, credits: 400 },
+  pro: { name: 'Pro', price: 50, credits: 1200 },
+} as const
+
+// Helper to check if an error is an insufficient credits error
+export function isInsufficientCreditsError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.status === 402 &&
+    (error.data as { code?: string })?.code === 'INSUFFICIENT_CREDITS'
+  )
+}
+
+// ============================================
+// Pronunciation Stats API
+// ============================================
+
+export interface PhonemeAccuracy {
+  phoneme: string
+  totalAttempts: number
+  correctCount: number
+  accuracy: number
+}
+
+export interface SubstitutionPattern {
+  expectedPhoneme: string
+  actualPhoneme: string
+  count: number
+}
+
+export interface PhonemeStatsResponse {
+  totalPhonemes: number
+  overallAccuracy: number
+  phonemeStats: PhonemeAccuracy[]
+  commonSubstitutions: SubstitutionPattern[]
+}
+
+export async function getPhonemeStats(): Promise<PhonemeStatsResponse> {
+  return callAPI<PhonemeStatsResponse>('/api/pronunciation/stats')
 }
 
 export { ApiError }

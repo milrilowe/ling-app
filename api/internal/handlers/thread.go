@@ -18,22 +18,24 @@ import (
 )
 
 type ThreadHandler struct {
-	DB                    *db.DB
-	OpenAIClient          *services.OpenAIClient
-	Storage               *services.StorageService
-	WhisperClient         *services.WhisperClient
-	ElevenLabsClient      *services.ElevenLabsClient
-	PronunciationWorker   *services.PronunciationWorker
+	DB                  *db.DB
+	OpenAIClient        *services.OpenAIClient
+	Storage             *services.StorageService
+	WhisperClient       *services.WhisperClient
+	ElevenLabsClient    *services.ElevenLabsClient
+	PronunciationWorker *services.PronunciationWorker
+	CreditsService      *services.CreditsService
 }
 
-func NewThreadHandler(database *db.DB, openAIClient *services.OpenAIClient, storage *services.StorageService, whisper *services.WhisperClient, elevenlabs *services.ElevenLabsClient, pronunciationWorker *services.PronunciationWorker) *ThreadHandler {
+func NewThreadHandler(database *db.DB, openAIClient *services.OpenAIClient, storage *services.StorageService, whisper *services.WhisperClient, elevenlabs *services.ElevenLabsClient, pronunciationWorker *services.PronunciationWorker, creditsService *services.CreditsService) *ThreadHandler {
 	return &ThreadHandler{
-		DB:                    database,
-		OpenAIClient:          openAIClient,
-		Storage:               storage,
-		WhisperClient:         whisper,
-		ElevenLabsClient:      elevenlabs,
-		PronunciationWorker:   pronunciationWorker,
+		DB:                  database,
+		OpenAIClient:        openAIClient,
+		Storage:             storage,
+		WhisperClient:       whisper,
+		ElevenLabsClient:    elevenlabs,
+		PronunciationWorker: pronunciationWorker,
+		CreditsService:      creditsService,
 	}
 }
 
@@ -260,6 +262,16 @@ func (h *ThreadHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
+	// Deduct credits for text message
+	if h.CreditsService != nil {
+		cost := middleware.GetCreditsCost(c)
+		if cost > 0 {
+			if err := h.CreditsService.DeductCredits(user.ID, cost, responseMessage.ID.String(), "Text message"); err != nil {
+				log.Printf("Failed to deduct credits: %v", err)
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, responseMessage)
 }
 
@@ -441,6 +453,16 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 		log.Printf("Error creating AI response: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create response"})
 		return
+	}
+
+	// Deduct credits for audio message
+	if h.CreditsService != nil {
+		cost := middleware.GetCreditsCost(c)
+		if cost > 0 {
+			if err := h.CreditsService.DeductCredits(user.ID, cost, responseMessage.ID.String(), "Audio message"); err != nil {
+				log.Printf("Failed to deduct credits: %v", err)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

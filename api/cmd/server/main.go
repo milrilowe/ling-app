@@ -33,6 +33,11 @@ func main() {
 		&models.Session{},
 		&models.Thread{},
 		&models.Message{},
+		&models.Subscription{},
+		&models.Credits{},
+		&models.CreditTransaction{},
+		&models.PhonemeStats{},
+		&models.PhonemeSubstitution{},
 	); err != nil {
 		log.Fatal("Failed to run migrations:", err)
 		os.Exit(1)
@@ -45,6 +50,7 @@ func main() {
 	// Initialize storage service
 	storageService, err := services.NewStorageService(
 		cfg.S3Endpoint,
+		cfg.S3InternalEndpoint, // Internal endpoint for Docker-to-Docker communication (e.g., MFA -> MinIO)
 		cfg.S3AccessKey,
 		cfg.S3SecretKey,
 		cfg.S3Bucket,
@@ -72,13 +78,22 @@ func main() {
 	// Initialize ML client for pronunciation analysis
 	mlClient := services.NewMLClient(cfg.MLServiceURL, time.Duration(cfg.MLServiceTimeout)*time.Second)
 
+	// Initialize phoneme stats service
+	phonemeStatsService := services.NewPhonemeStatsService(database)
+
 	// Initialize pronunciation worker
-	pronunciationWorker := services.NewPronunciationWorker(database, mlClient, storageService)
+	pronunciationWorker := services.NewPronunciationWorker(database, mlClient, storageService, phonemeStatsService)
+
+	// Initialize credits and subscription services
+	creditsService := services.NewCreditsService(database)
+	stripeService := services.NewStripeService(cfg, database, creditsService)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, oauthService, cfg)
-	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, elevenLabsClient, pronunciationWorker)
+	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, elevenLabsClient, pronunciationWorker, creditsService)
 	audioHandler := handlers.NewAudioHandler(storageService)
+	subscriptionHandler := handlers.NewSubscriptionHandler(stripeService, creditsService)
+	phonemeStatsHandler := handlers.NewPhonemeStatsHandler(phonemeStatsService)
 
 	// Set Gin mode
 	gin.SetMode(cfg.GinMode)
@@ -121,12 +136,30 @@ func main() {
 			protected.GET("/threads", threadHandler.GetThreads)
 			protected.POST("/threads", threadHandler.CreateThread)
 			protected.GET("/threads/:id", threadHandler.GetThread)
-			protected.POST("/threads/:id/messages", threadHandler.SendMessage)
-			protected.POST("/threads/:id/messages/audio", threadHandler.SendAudioMessage)
+			// Messages - with credit enforcement
+			protected.POST("/threads/:id/messages",
+				middleware.RequireCredits(creditsService, models.CreditCostTextMessage),
+				threadHandler.SendMessage)
+			protected.POST("/threads/:id/messages/audio",
+				middleware.RequireCredits(creditsService, models.CreditCostAudioMessage),
+				threadHandler.SendAudioMessage)
 
 			// Audio - use *key to capture full path including slashes
 			protected.GET("/audio/*key", audioHandler.GetAudio)
+
+			// Subscription and Credits
+			protected.GET("/subscription", subscriptionHandler.GetSubscriptionStatus)
+			protected.POST("/subscription/checkout", subscriptionHandler.CreateCheckoutSession)
+			protected.POST("/subscription/portal", subscriptionHandler.CreatePortalSession)
+			protected.GET("/credits", subscriptionHandler.GetCreditsBalance)
+			protected.GET("/credits/history", subscriptionHandler.GetCreditHistory)
+
+			// Pronunciation stats
+			protected.GET("/pronunciation/stats", phonemeStatsHandler.GetStats)
 		}
+
+		// Stripe webhook (no auth - verified by Stripe signature)
+		api.POST("/webhooks/stripe", subscriptionHandler.HandleStripeWebhook)
 	}
 
 	// Start server

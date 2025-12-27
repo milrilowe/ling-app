@@ -10,15 +10,28 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as PronunciationRouteImport } from './routes/pronunciation'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CRouteImport } from './routes/c'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SubscriptionSuccessRouteImport } from './routes/subscription.success'
 import { Route as CThreadIdRouteImport } from './routes/c.$threadId'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PronunciationRoute = PronunciationRouteImport.update({
+  id: '/pronunciation',
+  path: '/pronunciation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -36,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SubscriptionSuccessRoute = SubscriptionSuccessRouteImport.update({
+  id: '/subscription/success',
+  path: '/subscription/success',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CThreadIdRoute = CThreadIdRouteImport.update({
   id: '/$threadId',
   path: '/$threadId',
@@ -51,26 +69,35 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/c': typeof CRouteWithChildren
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
+  '/pronunciation': typeof PronunciationRoute
   '/register': typeof RegisterRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/c/$threadId': typeof CThreadIdRoute
+  '/subscription/success': typeof SubscriptionSuccessRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/c': typeof CRouteWithChildren
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
+  '/pronunciation': typeof PronunciationRoute
   '/register': typeof RegisterRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/c/$threadId': typeof CThreadIdRoute
+  '/subscription/success': typeof SubscriptionSuccessRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/c': typeof CRouteWithChildren
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
+  '/pronunciation': typeof PronunciationRoute
   '/register': typeof RegisterRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/c/$threadId': typeof CThreadIdRoute
+  '/subscription/success': typeof SubscriptionSuccessRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -78,27 +105,45 @@ export interface FileRouteTypes {
     | '/'
     | '/c'
     | '/login'
+    | '/pricing'
+    | '/pronunciation'
     | '/register'
     | '/auth/callback'
     | '/c/$threadId'
+    | '/subscription/success'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/c' | '/login' | '/register' | '/auth/callback' | '/c/$threadId'
+  to:
+    | '/'
+    | '/c'
+    | '/login'
+    | '/pricing'
+    | '/pronunciation'
+    | '/register'
+    | '/auth/callback'
+    | '/c/$threadId'
+    | '/subscription/success'
   id:
     | '__root__'
     | '/'
     | '/c'
     | '/login'
+    | '/pricing'
+    | '/pronunciation'
     | '/register'
     | '/auth/callback'
     | '/c/$threadId'
+    | '/subscription/success'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CRoute: typeof CRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PricingRoute: typeof PricingRoute
+  PronunciationRoute: typeof PronunciationRoute
   RegisterRoute: typeof RegisterRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  SubscriptionSuccessRoute: typeof SubscriptionSuccessRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -108,6 +153,20 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pronunciation': {
+      id: '/pronunciation'
+      path: '/pronunciation'
+      fullPath: '/pronunciation'
+      preLoaderRoute: typeof PronunciationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -129,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscription/success': {
+      id: '/subscription/success'
+      path: '/subscription/success'
+      fullPath: '/subscription/success'
+      preLoaderRoute: typeof SubscriptionSuccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/c/$threadId': {
@@ -162,8 +228,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CRoute: CRouteWithChildren,
   LoginRoute: LoginRoute,
+  PricingRoute: PricingRoute,
+  PronunciationRoute: PronunciationRoute,
   RegisterRoute: RegisterRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  SubscriptionSuccessRoute: SubscriptionSuccessRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -38,6 +38,26 @@ services:
       timeout: 20s
       retries: 3
 
+  # MFA (Montreal Forced Aligner) Service
+  mfa:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile.mfa
+    container_name: ling-app-mfa
+    ports:
+      - "8001:8001"
+    volumes:
+      - mfa_data:/mfa  # Persist MFA internal data
+    environment:
+      - MFA_ROOT_DIR=/mfa
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   minio_data:
+  mfa_data:

@@ -30,6 +30,10 @@ type User struct {
 
 	// Relationships - a user has many threads
 	Threads []Thread `gorm:"foreignKey:UserID" json:"-"`
+
+	// Subscription and credits
+	Subscription *Subscription `gorm:"foreignKey:UserID" json:"-"`
+	Credits      *Credits      `gorm:"foreignKey:UserID" json:"-"`
 }
 
 // BeforeCreate is a GORM hook that runs before inserting a new record.

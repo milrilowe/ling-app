@@ -47,11 +47,17 @@ type Message struct {
 	HasAudio             bool      `gorm:"default:false" json:"hasAudio"`
 	Timestamp            time.Time `json:"timestamp"`
 
-	// Pronunciation analysis fields
+	// Pronunciation analysis fields (for user messages)
 	PronunciationStatus    string     `gorm:"type:varchar(20);default:'none'" json:"pronunciationStatus"` // "none", "pending", "complete", "failed"
 	PronunciationAnalysis  JSONMap    `gorm:"type:jsonb" json:"pronunciationAnalysis,omitempty"`          // Full analysis JSON object
 	PronunciationError     *string    `gorm:"type:text" json:"pronunciationError,omitempty"`              // Error message if failed
 	PronunciationUpdatedAt *time.Time `json:"pronunciationUpdatedAt,omitempty"`
+
+	// Word timing fields for karaoke subtitles (for assistant messages)
+	// Populated by MFA alignment after TTS audio is generated
+	WordTimings       JSONMap    `gorm:"type:jsonb" json:"wordTimings,omitempty"`       // Array of {word, start, end}
+	WordTimingsStatus string     `gorm:"type:varchar(20);default:'none'" json:"wordTimingsStatus"` // "none", "pending", "complete", "failed"
+	WordTimingsError  *string    `gorm:"type:text" json:"wordTimingsError,omitempty"`
 }
 
 func (m *Message) BeforeCreate(tx *gorm.DB) error {

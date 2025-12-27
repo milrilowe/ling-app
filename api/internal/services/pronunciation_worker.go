@@ -14,17 +14,19 @@ import (
 
 // PronunciationWorker handles async pronunciation analysis
 type PronunciationWorker struct {
-	DB       *db.DB
-	MLClient *MLClient
-	Storage  *StorageService
+	DB                  *db.DB
+	MLClient            *MLClient
+	Storage             *StorageService
+	PhonemeStatsService *PhonemeStatsService
 }
 
 // NewPronunciationWorker creates a new pronunciation worker
-func NewPronunciationWorker(database *db.DB, mlClient *MLClient, storage *StorageService) *PronunciationWorker {
+func NewPronunciationWorker(database *db.DB, mlClient *MLClient, storage *StorageService, phonemeStatsService *PhonemeStatsService) *PronunciationWorker {
 	return &PronunciationWorker{
-		DB:       database,
-		MLClient: mlClient,
-		Storage:  storage,
+		DB:                  database,
+		MLClient:            mlClient,
+		Storage:             storage,
+		PhonemeStatsService: phonemeStatsService,
 	}
 }
 
@@ -105,6 +107,28 @@ func (w *PronunciationWorker) AnalyzeAsync(messageID uuid.UUID, audioKey, expect
 
 	log.Printf("[PronunciationWorker] Analysis complete for message %s: %d/%d phonemes matched",
 		messageID, result.Analysis.MatchCount, result.Analysis.PhonemeCount)
+
+	// Record phoneme stats for the user
+	if w.PhonemeStatsService != nil && len(result.Analysis.PhonemeDetails) > 0 {
+		// Get user ID from message -> thread -> user
+		var message models.Message
+		if err := w.DB.First(&message, messageID).Error; err != nil {
+			log.Printf("[PronunciationWorker] Failed to fetch message for phoneme stats: %v", err)
+			return
+		}
+
+		var thread models.Thread
+		if err := w.DB.First(&thread, message.ThreadID).Error; err != nil {
+			log.Printf("[PronunciationWorker] Failed to fetch thread for phoneme stats: %v", err)
+			return
+		}
+
+		if err := w.PhonemeStatsService.RecordPhonemeResults(thread.UserID, result.Analysis.PhonemeDetails); err != nil {
+			log.Printf("[PronunciationWorker] Failed to record phoneme stats: %v", err)
+		} else {
+			log.Printf("[PronunciationWorker] Recorded phoneme stats for user %s", thread.UserID)
+		}
+	}
 }
 
 // markFailed updates the message with a failed status

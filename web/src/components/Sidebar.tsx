@@ -14,8 +14,9 @@ import {
 } from '@/components/ui/sidebar'
 import { ThreadListItem } from '@/features/sidebar/components/ThreadListItem'
 import { useThreads } from '@/hooks/use-thread'
-import { useNavigate } from '@tanstack/react-router'
-import { Sparkles, PenSquare, Search, Settings } from 'lucide-react'
+import { useNavigate, Link } from '@tanstack/react-router'
+import { Sparkles, PenSquare, Search, Settings, Coins, BarChart3 } from 'lucide-react'
+import { CreditBalance } from '@/components/subscription/CreditBalance'
 
 export function AppSidebar() {
   const navigate = useNavigate()
@@ -103,6 +104,24 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
+          {/* Pronunciation stats */}
+          <SidebarMenuItem>
+            <Link to="/pronunciation" className="w-full">
+              <SidebarMenuButton tooltip="Pronunciation Stats">
+                <BarChart3 className="h-4 w-4" />
+                <span>Pronunciation</span>
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+          {/* Credits display */}
+          <SidebarMenuItem>
+            <Link to="/pricing" className="w-full">
+              <SidebarMenuButton tooltip="Credits">
+                <Coins className="h-4 w-4" />
+                <CreditBalance showLabel={true} />
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton tooltip="Settings">
               <Settings className="h-4 w-4" />

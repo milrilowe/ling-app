@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -34,12 +34,12 @@ export function MessageBubble({
   const audioPlayer = useAudioPlayerContext()
   const [isPronunciationExpanded, setIsPronunciationExpanded] = useState(false)
 
-  // Show chevron when pronunciation is complete
-  const showPronunciationToggle = isUser && hasAudio && pronunciationStatus === 'complete'
-
   // Check if this specific audio is currently loaded
   const isThisAudioLoaded = audioPlayer.currentUrl === audioUrl
   const isThisAudioPlaying = isThisAudioLoaded && audioPlayer.isPlaying
+
+  // Show chevron when pronunciation is complete
+  const showPronunciationToggle = isUser && hasAudio && pronunciationStatus === 'complete'
 
   const handlePlayAudio = () => {
     if (!audioUrl) return
