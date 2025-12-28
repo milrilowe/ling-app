@@ -8,6 +8,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 import httpx
 
+import base64
+
 from .schemas import (
     PronunciationRequest,
     PronunciationResponse,
@@ -17,12 +19,15 @@ from .schemas import (
     AudioQuality,
     TranscribeRequest,
     TranscribeResponse,
+    SynthesizeRequest,
+    SynthesizeResponse,
 )
 from .audio_fetcher import AudioFetcher
 from src.ipa.audio_to_ipa import WhisperIPAConverter
 from src.ipa.text_to_ipa import GruutIPAConverter
 from src.ipa.aligner import PhonemeAligner
 from src.stt.transcriber import FasterWhisperTranscriber
+from src.tts.synthesizer import ChatterboxSynthesizer
 
 router = APIRouter()
 
@@ -32,6 +37,7 @@ gruut_converter: Optional[GruutIPAConverter] = None
 aligner: Optional[PhonemeAligner] = None
 audio_fetcher: Optional[AudioFetcher] = None
 stt_transcriber: Optional[FasterWhisperTranscriber] = None
+tts_synthesizer: Optional[ChatterboxSynthesizer] = None
 
 
 def get_models_loaded() -> bool:
@@ -47,7 +53,7 @@ def load_models(device: Optional[str] = None, language: str = "en-us"):
         device: Device for Whisper model ('cuda', 'cpu', or None for auto)
         language: Default language for text-to-IPA
     """
-    global whisper_converter, gruut_converter, aligner, audio_fetcher, stt_transcriber
+    global whisper_converter, gruut_converter, aligner, audio_fetcher, stt_transcriber, tts_synthesizer
 
     print("Loading pronunciation analysis models...")
 
@@ -58,6 +64,9 @@ def load_models(device: Optional[str] = None, language: str = "en-us"):
 
     print("Loading STT transcriber (faster-whisper)...")
     stt_transcriber = FasterWhisperTranscriber(model_size="medium", device=device)
+
+    print("Loading TTS synthesizer (Chatterbox)...")
+    tts_synthesizer = ChatterboxSynthesizer(device=device)
 
     print("All models loaded successfully!")
 
@@ -288,6 +297,59 @@ async def transcribe(request: TranscribeRequest) -> TranscribeResponse:
             error=PronunciationError(
                 code="TRANSCRIPTION_ERROR",
                 message=f"Failed to transcribe audio: {str(e)}",
+                retryable=True
+            )
+        )
+
+
+@router.post("/synthesize", response_model=SynthesizeResponse)
+async def synthesize(request: SynthesizeRequest) -> SynthesizeResponse:
+    """
+    Synthesize speech from text using Chatterbox TTS.
+
+    This endpoint:
+    1. Generates audio from the provided text
+    2. Returns base64-encoded audio data
+    """
+    if tts_synthesizer is None:
+        return SynthesizeResponse(
+            status="error",
+            error=PronunciationError(
+                code="MODELS_NOT_LOADED",
+                message="TTS model is not loaded. Server may still be starting.",
+                retryable=True
+            )
+        )
+
+    try:
+        # Generate audio
+        if request.format == "mp3":
+            result = tts_synthesizer.synthesize_to_mp3(
+                request.text,
+                exaggeration=request.exaggeration
+            )
+        else:
+            result = tts_synthesizer.synthesize(
+                request.text,
+                exaggeration=request.exaggeration
+            )
+
+        # Encode audio as base64
+        audio_base64 = base64.b64encode(result.audio_bytes).decode("utf-8")
+
+        return SynthesizeResponse(
+            status="success",
+            audio_base64=audio_base64,
+            duration=result.duration_seconds,
+            format=request.format
+        )
+
+    except Exception as e:
+        return SynthesizeResponse(
+            status="error",
+            error=PronunciationError(
+                code="SYNTHESIS_ERROR",
+                message=f"Failed to synthesize speech: {str(e)}",
                 retryable=True
             )
         )

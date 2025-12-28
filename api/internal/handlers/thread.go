@@ -22,19 +22,19 @@ type ThreadHandler struct {
 	OpenAIClient        *services.OpenAIClient
 	Storage             *services.StorageService
 	WhisperClient       *services.WhisperClient
-	ElevenLabsClient    *services.ElevenLabsClient
+	TTSClient           *services.TTSClient
 	PronunciationWorker *services.PronunciationWorker
 	CreditsService      *services.CreditsService
 	MaxAudioFileSize    int64
 }
 
-func NewThreadHandler(database *db.DB, openAIClient *services.OpenAIClient, storage *services.StorageService, whisper *services.WhisperClient, elevenlabs *services.ElevenLabsClient, pronunciationWorker *services.PronunciationWorker, creditsService *services.CreditsService, maxAudioFileSize int64) *ThreadHandler {
+func NewThreadHandler(database *db.DB, openAIClient *services.OpenAIClient, storage *services.StorageService, whisper *services.WhisperClient, ttsClient *services.TTSClient, pronunciationWorker *services.PronunciationWorker, creditsService *services.CreditsService, maxAudioFileSize int64) *ThreadHandler {
 	return &ThreadHandler{
 		DB:                  database,
 		OpenAIClient:        openAIClient,
 		Storage:             storage,
 		WhisperClient:       whisper,
-		ElevenLabsClient:    elevenlabs,
+		TTSClient:           ttsClient,
 		PronunciationWorker: pronunciationWorker,
 		CreditsService:      creditsService,
 		MaxAudioFileSize:    maxAudioFileSize,
@@ -298,7 +298,7 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 
 	// Generate TTS for AI response
 	assistantMessageID := uuid.New()
-	ttsResult, err := h.ElevenLabsClient.TextToSpeech(aiResponse, "")
+	ttsResult, err := h.TTSClient.Synthesize(ctx, aiResponse)
 	if err != nil {
 		log.Printf("Error generating TTS: %v", err)
 		// Continue without audio - save text-only response

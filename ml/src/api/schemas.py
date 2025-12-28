@@ -141,3 +141,49 @@ class TranscribeResponse(BaseModel):
         default=None,
         description="Error details (present when status is 'error')"
     )
+
+
+# TTS Schemas
+
+class SynthesizeRequest(BaseModel):
+    """Request body for text-to-speech synthesis."""
+
+    text: str = Field(
+        ...,
+        description="Text to synthesize into speech"
+    )
+    exaggeration: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Emotion exaggeration (0.0 = monotone, 1.0 = very expressive)"
+    )
+    format: str = Field(
+        default="mp3",
+        description="Output audio format ('mp3' or 'wav')"
+    )
+
+
+class SynthesizeResponse(BaseModel):
+    """Response body for text-to-speech synthesis."""
+
+    status: str = Field(
+        ...,
+        description="Status of the synthesis: 'success' or 'error'"
+    )
+    audio_base64: Optional[str] = Field(
+        default=None,
+        description="Base64-encoded audio data (present when status is 'success')"
+    )
+    duration: Optional[float] = Field(
+        default=None,
+        description="Audio duration in seconds"
+    )
+    format: Optional[str] = Field(
+        default=None,
+        description="Audio format ('mp3' or 'wav')"
+    )
+    error: Optional[PronunciationError] = Field(
+        default=None,
+        description="Error details (present when status is 'error')"
+    )

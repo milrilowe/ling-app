@@ -38,9 +38,6 @@ type Config struct {
 	// OpenAI
 	OpenAIAPIKey string
 
-	// ElevenLabs
-	ElevenLabsAPIKey string
-
 	// S3/MinIO Storage
 	S3Endpoint  string
 	S3AccessKey string
@@ -92,8 +89,6 @@ func Load() *Config {
 		MLServiceTimeout: 120, // 2 minutes for pronunciation analysis
 
 		OpenAIAPIKey: getEnv("OPENAI_API_KEY", ""),
-
-		ElevenLabsAPIKey: getEnv("ELEVENLABS_API_KEY", ""),
 
 		S3Endpoint:  getEnv("S3_ENDPOINT", "http://localhost:9000"),
 		S3AccessKey: getEnv("S3_ACCESS_KEY", "minioadmin"),

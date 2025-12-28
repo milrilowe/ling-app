@@ -72,7 +72,7 @@ func main() {
 	// Initialize AI clients
 	openAIClient := services.NewOpenAIClient(cfg.OpenAIAPIKey)
 	whisperClient := services.NewWhisperClient(cfg.MLServiceURL) // Uses local faster-whisper via ML service
-	elevenLabsClient := services.NewElevenLabsClient(cfg.ElevenLabsAPIKey)
+	ttsClient := services.NewTTSClient(cfg.MLServiceURL)         // Uses local Chatterbox TTS via ML service
 
 	// Initialize ML client for pronunciation analysis
 	mlClient := services.NewMLClient(cfg.MLServiceURL, time.Duration(cfg.MLServiceTimeout)*time.Second)
@@ -89,7 +89,7 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, oauthService, cfg)
-	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, elevenLabsClient, pronunciationWorker, creditsService, cfg.MaxAudioFileSize)
+	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, ttsClient, pronunciationWorker, creditsService, cfg.MaxAudioFileSize)
 	audioHandler := handlers.NewAudioHandler(storageService)
 	subscriptionHandler := handlers.NewSubscriptionHandler(stripeService, creditsService)
 	phonemeStatsHandler := handlers.NewPhonemeStatsHandler(phonemeStatsService)
