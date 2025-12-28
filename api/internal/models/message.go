@@ -53,11 +53,6 @@ type Message struct {
 	PronunciationError     *string    `gorm:"type:text" json:"pronunciationError,omitempty"`              // Error message if failed
 	PronunciationUpdatedAt *time.Time `json:"pronunciationUpdatedAt,omitempty"`
 
-	// Word timing fields for karaoke subtitles (for assistant messages)
-	// Populated by MFA alignment after TTS audio is generated
-	WordTimings       JSONMap    `gorm:"type:jsonb" json:"wordTimings,omitempty"`       // Array of {word, start, end}
-	WordTimingsStatus string     `gorm:"type:varchar(20);default:'none'" json:"wordTimingsStatus"` // "none", "pending", "complete", "failed"
-	WordTimingsError  *string    `gorm:"type:text" json:"wordTimingsError,omitempty"`
 }
 
 func (m *Message) BeforeCreate(tx *gorm.DB) error {

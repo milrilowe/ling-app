@@ -35,10 +35,6 @@ type Config struct {
 	MLServiceURL     string
 	MLServiceTimeout int // timeout in seconds for ML service calls
 
-	// MFA (Montreal Forced Aligner) Service
-	MFAServiceURL     string
-	MFAServiceTimeout int // timeout in seconds for alignment
-
 	// OpenAI
 	OpenAIAPIKey string
 
@@ -95,9 +91,6 @@ func Load() *Config {
 
 		MLServiceURL:     getEnv("ML_SERVICE_URL", "http://localhost:8000"),
 		MLServiceTimeout: 120, // 2 minutes for pronunciation analysis
-
-		MFAServiceURL:     getEnv("MFA_SERVICE_URL", "http://localhost:8001"),
-		MFAServiceTimeout: 120, // 2 minutes for alignment (MFA can be slow)
 
 		OpenAIAPIKey: getEnv("OPENAI_API_KEY", ""),
 
