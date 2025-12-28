@@ -15,6 +15,7 @@ interface PhonemeWithStats extends CanonicalPhoneme {
   accuracy: number | null
   totalAttempts: number
   correctCount: number
+  deletionCount: number
 }
 
 export function PhonemeGrid() {
@@ -30,6 +31,7 @@ export function PhonemeGrid() {
         accuracy: userStat?.accuracy ?? null,
         totalAttempts: userStat?.totalAttempts ?? 0,
         correctCount: userStat?.correctCount ?? 0,
+        deletionCount: userStat?.deletionCount ?? 0,
       }
     })
   }, [stats?.phonemeStats])
@@ -64,6 +66,7 @@ export function PhonemeGrid() {
       phoneme: selectedPhoneme.ipa,
       totalAttempts: selectedPhoneme.totalAttempts,
       correctCount: selectedPhoneme.correctCount,
+      deletionCount: selectedPhoneme.deletionCount,
       accuracy: selectedPhoneme.accuracy,
     }
   }, [selectedPhoneme])

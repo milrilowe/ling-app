@@ -414,6 +414,7 @@ export interface PhonemeAccuracy {
   phoneme: string
   totalAttempts: number
   correctCount: number
+  deletionCount: number
   accuracy: number
 }
 

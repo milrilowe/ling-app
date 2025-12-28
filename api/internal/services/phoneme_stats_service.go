@@ -47,12 +47,15 @@ func (s *PhonemeStatsService) RecordPhonemeResults(userID uuid.UUID, phonemeDeta
 				Phoneme:       expected,
 				TotalAttempts: 0,
 				CorrectCount:  0,
+				DeletionCount: 0,
 			}
 		}
 		statsMap[expected].TotalAttempts++
 
 		if detail.Type == "match" {
 			statsMap[expected].CorrectCount++
+		} else if detail.Type == "delete" {
+			statsMap[expected].DeletionCount++
 		} else if detail.Type == "substitute" && detail.Actual != "" {
 			// Track substitution pattern
 			subKey := expected + "->" + detail.Actual
@@ -66,7 +69,6 @@ func (s *PhonemeStatsService) RecordPhonemeResults(userID uuid.UUID, phonemeDeta
 			}
 			subsMap[subKey].OccurrenceCount++
 		}
-		// Note: "delete" means phoneme was expected but not pronounced - counts as attempt, not correct
 	}
 
 	// Upsert phoneme stats
@@ -76,6 +78,7 @@ func (s *PhonemeStatsService) RecordPhonemeResults(userID uuid.UUID, phonemeDeta
 			DoUpdates: clause.Assignments(map[string]interface{}{
 				"total_attempts": clause.Expr{SQL: "phoneme_stats.total_attempts + ?", Vars: []interface{}{stats.TotalAttempts}},
 				"correct_count":  clause.Expr{SQL: "phoneme_stats.correct_count + ?", Vars: []interface{}{stats.CorrectCount}},
+				"deletion_count": clause.Expr{SQL: "phoneme_stats.deletion_count + ?", Vars: []interface{}{stats.DeletionCount}},
 				"updated_at":     clause.Expr{SQL: "NOW()"},
 			}),
 		}).Create(stats).Error
@@ -114,6 +117,7 @@ type PhonemeAccuracy struct {
 	Phoneme       string  `json:"phoneme"`
 	TotalAttempts int     `json:"totalAttempts"`
 	CorrectCount  int     `json:"correctCount"`
+	DeletionCount int     `json:"deletionCount"`
 	Accuracy      float64 `json:"accuracy"`
 }
 
@@ -146,7 +150,7 @@ func (s *PhonemeStatsService) GetUserStats(userID uuid.UUID) (*UserPhonemeStatsR
 	// Get all phoneme stats for this user
 	var phonemeStats []PhonemeAccuracy
 	if err := s.DB.Model(&models.PhonemeStats{}).
-		Select("phoneme, total_attempts, correct_count, (CAST(correct_count AS FLOAT) / CAST(total_attempts AS FLOAT) * 100) as accuracy").
+		Select("phoneme, total_attempts, correct_count, deletion_count, (CAST(correct_count AS FLOAT) / CAST(total_attempts AS FLOAT) * 100) as accuracy").
 		Where("user_id = ?", userID).
 		Order("accuracy ASC").
 		Scan(&phonemeStats).Error; err != nil {

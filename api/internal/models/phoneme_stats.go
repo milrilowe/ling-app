@@ -18,6 +18,7 @@ type PhonemeStats struct {
 	// Aggregate statistics
 	TotalAttempts int `gorm:"not null;default:0" json:"totalAttempts"`
 	CorrectCount  int `gorm:"not null;default:0" json:"correctCount"`
+	DeletionCount int `gorm:"not null;default:0" json:"deletionCount"`
 
 	// Timestamps
 	CreatedAt time.Time `json:"createdAt"`
