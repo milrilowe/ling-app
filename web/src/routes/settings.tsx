@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowLeft, LogOut, Loader2, ExternalLink } from 'lucide-react'
+import { X, LogOut, Loader2, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -35,21 +35,20 @@ function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" />
-            Back to app
+    <div className="min-h-screen bg-background overflow-y-auto">
+      {/* Sticky header */}
+      <div className="sticky top-0 bg-background py-4 px-4 border-b mb-6 z-10">
+        <div className="flex items-center gap-2">
+          <Link to="/">
+            <Button variant="ghost" size="icon" className="h-10 w-10">
+              <X className="h-5 w-5" />
+            </Button>
           </Link>
+          <h1 className="text-2xl font-semibold">Settings</h1>
         </div>
+      </div>
 
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-2">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your account and preferences
-          </p>
-        </div>
+      <div className="mx-auto max-w-2xl px-6 pb-6">
 
         <div className="space-y-6">
           {/* Account Section */}
