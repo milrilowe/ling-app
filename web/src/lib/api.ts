@@ -91,6 +91,8 @@ export interface Message {
 
 export interface Thread {
   id: string
+  name?: string | null
+  archivedAt?: string | null
   messages: Message[]
   createdAt: string
 }
@@ -154,6 +156,38 @@ export async function sendMessage(
 
 export async function getThreads(): Promise<Thread[]> {
   return callAPI<Thread[]>('/api/threads')
+}
+
+export async function getArchivedThreads(): Promise<Thread[]> {
+  return callAPI<Thread[]>('/api/threads/archived')
+}
+
+export async function updateThread(
+  threadId: string,
+  data: { name?: string | null },
+): Promise<Thread> {
+  return callAPI<Thread>(`/api/threads/${threadId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteThread(threadId: string): Promise<void> {
+  await callAPI<{ message: string }>(`/api/threads/${threadId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function archiveThread(threadId: string): Promise<Thread> {
+  return callAPI<Thread>(`/api/threads/${threadId}/archive`, {
+    method: 'POST',
+  })
+}
+
+export async function unarchiveThread(threadId: string): Promise<Thread> {
+  return callAPI<Thread>(`/api/threads/${threadId}/unarchive`, {
+    method: 'POST',
+  })
 }
 
 export interface SendAudioMessageResponse {

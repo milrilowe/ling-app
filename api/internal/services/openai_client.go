@@ -47,3 +47,34 @@ func (c *OpenAIClient) Generate(messages []ConversationMessage) (string, error) 
 
 	return resp.Choices[0].Message.Content, nil
 }
+
+// GenerateTitle generates a short title (3-5 words) from conversation content
+func (c *OpenAIClient) GenerateTitle(content string) (string, error) {
+	resp, err := c.client.CreateChatCompletion(
+		context.Background(),
+		openai.ChatCompletionRequest{
+			Model: openai.GPT4oMini,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    "system",
+					Content: "Generate a very short title (3-5 words) that describes the topic of this conversation. Return only the title, no quotes or punctuation.",
+				},
+				{
+					Role:    "user",
+					Content: content,
+				},
+			},
+			MaxTokens: 20,
+		},
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to generate title: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no response choices returned from OpenAI")
+	}
+
+	return resp.Choices[0].Message.Content, nil
+}

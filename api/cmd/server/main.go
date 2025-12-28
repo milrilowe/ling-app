@@ -133,8 +133,13 @@ func main() {
 		{
 			// Threads
 			protected.GET("/threads", threadHandler.GetThreads)
+			protected.GET("/threads/archived", threadHandler.GetArchivedThreads)
 			protected.POST("/threads", threadHandler.CreateThread)
 			protected.GET("/threads/:id", threadHandler.GetThread)
+			protected.PATCH("/threads/:id", threadHandler.UpdateThread)
+			protected.DELETE("/threads/:id", threadHandler.DeleteThread)
+			protected.POST("/threads/:id/archive", threadHandler.ArchiveThread)
+			protected.POST("/threads/:id/unarchive", threadHandler.UnarchiveThread)
 			// Voice message - with credit enforcement (1 credit per voice submission)
 			protected.POST("/threads/:id/messages/audio",
 				middleware.RequireCredits(creditsService, models.CreditCostPerMessage),

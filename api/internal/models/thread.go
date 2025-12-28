@@ -8,10 +8,12 @@ import (
 )
 
 type Thread struct {
-	ID        uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
-	UserID    uuid.UUID `gorm:"type:uuid;index;not null" json:"-"` // Owner of the thread
-	Messages  []Message `gorm:"foreignKey:ThreadID;constraint:OnDelete:CASCADE" json:"messages"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID         uuid.UUID  `gorm:"type:uuid;primary_key" json:"id"`
+	UserID     uuid.UUID  `gorm:"type:uuid;index;not null" json:"-"` // Owner of the thread
+	Name       *string    `gorm:"type:varchar(255)" json:"name"`
+	ArchivedAt *time.Time `gorm:"index" json:"archivedAt,omitempty"`
+	Messages   []Message  `gorm:"foreignKey:ThreadID;constraint:OnDelete:CASCADE" json:"messages"`
+	CreatedAt  time.Time  `json:"createdAt"`
 }
 
 func (t *Thread) BeforeCreate(tx *gorm.DB) error {

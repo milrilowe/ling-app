@@ -47,14 +47,25 @@ type CreateThreadRequest struct {
 }
 
 
-// GetThreads retrieves all threads for the current user, ordered by most recent
+// GetThreads retrieves all non-archived threads for the current user, ordered by most recent
 func (h *ThreadHandler) GetThreads(c *gin.Context) {
-	// Get current user from context (set by RequireAuth middleware)
 	user := middleware.MustGetUser(c)
 
 	var threads []models.Thread
-	if err := h.DB.Where("user_id = ?", user.ID).Order("created_at DESC").Find(&threads).Error; err != nil {
+	if err := h.DB.Where("user_id = ? AND archived_at IS NULL", user.ID).Order("created_at DESC").Find(&threads).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch threads"})
+		return
+	}
+	c.JSON(http.StatusOK, threads)
+}
+
+// GetArchivedThreads retrieves all archived threads for the current user
+func (h *ThreadHandler) GetArchivedThreads(c *gin.Context) {
+	user := middleware.MustGetUser(c)
+
+	var threads []models.Thread
+	if err := h.DB.Where("user_id = ? AND archived_at IS NOT NULL", user.ID).Order("archived_at DESC").Find(&threads).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch archived threads"})
 		return
 	}
 	c.JSON(http.StatusOK, threads)
@@ -150,6 +161,9 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
 			return
 		}
+
+		// Auto-generate thread name from AI response (async)
+		go h.generateThreadName(thread.ID, aiResponse)
 	}
 
 	// Load thread with messages
@@ -372,6 +386,9 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 		return
 	}
 
+	// Auto-generate thread name from AI response (async)
+	go h.generateThreadName(thread.ID, aiResponse)
+
 	// Deduct credits for voice message
 	if h.CreditsService != nil {
 		cost := middleware.GetCreditsCost(c)
@@ -389,4 +406,155 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 		"userMessage":      userMessage,
 		"assistantMessage": responseMessage,
 	})
+}
+
+// generateThreadName generates a thread name from AI response content (runs async)
+func (h *ThreadHandler) generateThreadName(threadID uuid.UUID, aiResponse string) {
+	// Check if thread already has a name
+	var thread models.Thread
+	if err := h.DB.First(&thread, threadID).Error; err != nil {
+		log.Printf("Error fetching thread for naming: %v", err)
+		return
+	}
+
+	if thread.Name != nil {
+		return // Already named
+	}
+
+	// Generate title from AI response
+	title, err := h.OpenAIClient.GenerateTitle(aiResponse)
+	if err != nil {
+		log.Printf("Error generating thread title: %v", err)
+		return
+	}
+
+	// Update thread name
+	if err := h.DB.Model(&thread).Update("name", title).Error; err != nil {
+		log.Printf("Error updating thread name: %v", err)
+	}
+}
+
+// UpdateThreadRequest represents the request body for updating a thread
+type UpdateThreadRequest struct {
+	Name *string `json:"name"`
+}
+
+// UpdateThread updates a thread's properties (rename)
+func (h *ThreadHandler) UpdateThread(c *gin.Context) {
+	user := middleware.MustGetUser(c)
+	threadID := c.Param("id")
+
+	parsedID, err := uuid.Parse(threadID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid thread ID"})
+		return
+	}
+
+	var thread models.Thread
+	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+		return
+	}
+
+	var req UpdateThreadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Name != nil {
+		thread.Name = req.Name
+	}
+
+	if err := h.DB.Save(&thread).Error; err != nil {
+		log.Printf("Error updating thread: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thread"})
+		return
+	}
+
+	c.JSON(http.StatusOK, thread)
+}
+
+// DeleteThread deletes a thread and all its messages
+func (h *ThreadHandler) DeleteThread(c *gin.Context) {
+	user := middleware.MustGetUser(c)
+	threadID := c.Param("id")
+
+	parsedID, err := uuid.Parse(threadID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid thread ID"})
+		return
+	}
+
+	var thread models.Thread
+	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+		return
+	}
+
+	// Delete thread (messages cascade delete via GORM constraint)
+	if err := h.DB.Delete(&thread).Error; err != nil {
+		log.Printf("Error deleting thread: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete thread"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Thread deleted"})
+}
+
+// ArchiveThread sets the ArchivedAt timestamp on a thread
+func (h *ThreadHandler) ArchiveThread(c *gin.Context) {
+	user := middleware.MustGetUser(c)
+	threadID := c.Param("id")
+
+	parsedID, err := uuid.Parse(threadID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid thread ID"})
+		return
+	}
+
+	var thread models.Thread
+	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+		return
+	}
+
+	now := time.Now()
+	thread.ArchivedAt = &now
+
+	if err := h.DB.Save(&thread).Error; err != nil {
+		log.Printf("Error archiving thread: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive thread"})
+		return
+	}
+
+	c.JSON(http.StatusOK, thread)
+}
+
+// UnarchiveThread clears the ArchivedAt timestamp on a thread
+func (h *ThreadHandler) UnarchiveThread(c *gin.Context) {
+	user := middleware.MustGetUser(c)
+	threadID := c.Param("id")
+
+	parsedID, err := uuid.Parse(threadID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid thread ID"})
+		return
+	}
+
+	var thread models.Thread
+	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+		return
+	}
+
+	thread.ArchivedAt = nil
+
+	if err := h.DB.Save(&thread).Error; err != nil {
+		log.Printf("Error unarchiving thread: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unarchive thread"})
+		return
+	}
+
+	c.JSON(http.StatusOK, thread)
 }

@@ -3,12 +3,18 @@ import {
   createThread,
   getThread,
   getThreads,
+  getArchivedThreads,
   sendMessage,
   getRandomPrompt,
+  updateThread,
+  deleteThread,
+  archiveThread,
+  unarchiveThread,
 } from '@/lib/api'
 
 const threadKeys = {
   all: ['threads'] as const,
+  archived: ['threads', 'archived'] as const,
   detail: (threadId: string) => ['threads', threadId] as const,
 }
 
@@ -64,6 +70,68 @@ export function useSendMessage(threadId: string) {
     mutationFn: (content: string) => sendMessage(threadId, content),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: threadKeys.detail(threadId) })
+    },
+  })
+}
+
+export function useArchivedThreads() {
+  return useQuery({
+    queryKey: threadKeys.archived,
+    queryFn: getArchivedThreads,
+  })
+}
+
+export function useUpdateThread() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      threadId,
+      data,
+    }: {
+      threadId: string
+      data: { name?: string | null }
+    }) => updateThread(threadId, data),
+    onSuccess: (_, { threadId }) => {
+      queryClient.invalidateQueries({ queryKey: threadKeys.all })
+      queryClient.invalidateQueries({ queryKey: threadKeys.archived })
+      queryClient.invalidateQueries({ queryKey: threadKeys.detail(threadId) })
+    },
+  })
+}
+
+export function useDeleteThread() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: deleteThread,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: threadKeys.all })
+      queryClient.invalidateQueries({ queryKey: threadKeys.archived })
+    },
+  })
+}
+
+export function useArchiveThread() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: archiveThread,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: threadKeys.all })
+      queryClient.invalidateQueries({ queryKey: threadKeys.archived })
+    },
+  })
+}
+
+export function useUnarchiveThread() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: unarchiveThread,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: threadKeys.all })
+      queryClient.invalidateQueries({ queryKey: threadKeys.archived })
     },
   })
 }

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Sidebar,
@@ -12,15 +13,32 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { ThreadListItem } from '@/features/sidebar/components/ThreadListItem'
-import { useThreads } from '@/hooks/use-thread'
+import { useThreads, useArchivedThreads } from '@/hooks/use-thread'
 import { useNavigate, Link } from '@tanstack/react-router'
-import { Sparkles, PenSquare, Search, Settings, Coins, BarChart3 } from 'lucide-react'
+import {
+  Sparkles,
+  PenSquare,
+  Search,
+  Settings,
+  Coins,
+  BarChart3,
+  Archive,
+  ChevronDown,
+} from 'lucide-react'
 import { CreditBalance } from '@/components/subscription/CreditBalance'
+import { cn } from '@/lib/utils'
 
 export function AppSidebar() {
   const navigate = useNavigate()
   const { data: threads, isLoading } = useThreads()
+  const { data: archivedThreads } = useArchivedThreads()
+  const [showArchived, setShowArchived] = useState(false)
 
   const handleNewChat = () => {
     navigate({ to: '/' })
@@ -96,6 +114,33 @@ export function AppSidebar() {
                 <div className="px-3 py-8 text-center text-sm text-muted-foreground">
                   No conversations yet. Start a new one!
                 </div>
+              )}
+
+              {/* Archived threads section */}
+              {archivedThreads && archivedThreads.length > 0 && (
+                <Collapsible
+                  open={showArchived}
+                  onOpenChange={setShowArchived}
+                  className="mt-4"
+                >
+                  <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground">
+                    <Archive className="h-4 w-4" />
+                    <span>Archived</span>
+                    <ChevronDown
+                      className={cn(
+                        'ml-auto h-4 w-4 transition-transform',
+                        showArchived && 'rotate-180'
+                      )}
+                    />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenu>
+                      {archivedThreads.map((thread) => (
+                        <ThreadListItem key={thread.id} thread={thread} />
+                      ))}
+                    </SidebarMenu>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
             </div>
           </SidebarGroupContent>
