@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as PronunciationRouteImport } from './routes/pronunciation'
 import { Route as PricingRouteImport } from './routes/pricing'
@@ -19,6 +20,11 @@ import { Route as SubscriptionSuccessRouteImport } from './routes/subscription.s
 import { Route as CThreadIdRouteImport } from './routes/c.$threadId'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/pronunciation': typeof PronunciationRoute
   '/register': typeof RegisterRoute
+  '/settings': typeof SettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/c/$threadId': typeof CThreadIdRoute
   '/subscription/success': typeof SubscriptionSuccessRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/pronunciation': typeof PronunciationRoute
   '/register': typeof RegisterRoute
+  '/settings': typeof SettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/c/$threadId': typeof CThreadIdRoute
   '/subscription/success': typeof SubscriptionSuccessRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/pronunciation': typeof PronunciationRoute
   '/register': typeof RegisterRoute
+  '/settings': typeof SettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/c/$threadId': typeof CThreadIdRoute
   '/subscription/success': typeof SubscriptionSuccessRoute
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/pronunciation'
     | '/register'
+    | '/settings'
     | '/auth/callback'
     | '/c/$threadId'
     | '/subscription/success'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/pronunciation'
     | '/register'
+    | '/settings'
     | '/auth/callback'
     | '/c/$threadId'
     | '/subscription/success'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/pronunciation'
     | '/register'
+    | '/settings'
     | '/auth/callback'
     | '/c/$threadId'
     | '/subscription/success'
@@ -142,12 +154,20 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   PronunciationRoute: typeof PronunciationRoute
   RegisterRoute: typeof RegisterRoute
+  SettingsRoute: typeof SettingsRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   SubscriptionSuccessRoute: typeof SubscriptionSuccessRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
@@ -231,6 +251,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   PronunciationRoute: PronunciationRoute,
   RegisterRoute: RegisterRoute,
+  SettingsRoute: SettingsRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   SubscriptionSuccessRoute: SubscriptionSuccessRoute,
 }

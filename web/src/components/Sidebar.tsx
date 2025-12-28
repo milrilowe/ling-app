@@ -26,12 +26,10 @@ import {
   PenSquare,
   Search,
   Settings,
-  Coins,
-  BarChart3,
   Archive,
   ChevronDown,
+  BarChart3,
 } from 'lucide-react'
-import { CreditBalance } from '@/components/subscription/CreditBalance'
 import { cn } from '@/lib/utils'
 
 export function AppSidebar() {
@@ -149,7 +147,6 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
-          {/* Pronunciation stats */}
           <SidebarMenuItem>
             <Link to="/pronunciation" className="w-full">
               <SidebarMenuButton tooltip="Pronunciation Stats">
@@ -158,20 +155,13 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
-          {/* Credits display */}
           <SidebarMenuItem>
-            <Link to="/pricing" className="w-full">
-              <SidebarMenuButton tooltip="Credits">
-                <Coins className="h-4 w-4" />
-                <CreditBalance showLabel={true} />
+            <Link to="/settings" className="w-full">
+              <SidebarMenuButton tooltip="Settings">
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
               </SidebarMenuButton>
             </Link>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Settings">
-              <Settings className="h-4 w-4" />
-              <span>Settings</span>
-            </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
