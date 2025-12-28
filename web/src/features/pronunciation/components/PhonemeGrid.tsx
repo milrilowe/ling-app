@@ -1,8 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
   ENGLISH_PHONEMES,
-  CATEGORY_LABELS,
-  CATEGORY_ORDER,
   type CanonicalPhoneme,
   type PhonemeCategory,
 } from '@/data/phonemes'
@@ -18,7 +16,12 @@ interface PhonemeWithStats extends CanonicalPhoneme {
   deletionCount: number
 }
 
-export function PhonemeGrid() {
+interface PhonemeGridProps {
+  activeCategory: PhonemeCategory
+  compact?: boolean
+}
+
+export function PhonemeGrid({ activeCategory, compact = false }: PhonemeGridProps) {
   const { data: stats } = usePhonemeStats()
   const [selectedPhoneme, setSelectedPhoneme] = useState<PhonemeWithStats | null>(null)
 
@@ -36,20 +39,10 @@ export function PhonemeGrid() {
     })
   }, [stats?.phonemeStats])
 
-  // Group phonemes by category
-  const groupedPhonemes = useMemo(() => {
-    const grouped = new Map<PhonemeCategory, PhonemeWithStats[]>()
-    for (const category of CATEGORY_ORDER) {
-      grouped.set(category, [])
-    }
-    for (const phoneme of phonemesWithStats) {
-      const list = grouped.get(phoneme.category)
-      if (list) {
-        list.push(phoneme)
-      }
-    }
-    return grouped
-  }, [phonemesWithStats])
+  // Filter by active category
+  const filteredPhonemes = useMemo(() => {
+    return phonemesWithStats.filter((p) => p.category === activeCategory)
+  }, [phonemesWithStats, activeCategory])
 
   // Get substitutions for selected phoneme
   const selectedSubstitutions = useMemo(() => {
@@ -73,30 +66,19 @@ export function PhonemeGrid() {
 
   return (
     <>
-      <div className="space-y-6">
-        {CATEGORY_ORDER.map((category) => {
-          const phonemes = groupedPhonemes.get(category)
-          if (!phonemes || phonemes.length === 0) return null
-
-          return (
-            <div key={category}>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                {CATEGORY_LABELS[category]}
-              </h3>
-              <div className="grid grid-cols-5 gap-2">
-                {phonemes.map((phoneme) => (
-                  <PhonemeCard
-                    key={phoneme.ipa}
-                    ipa={phoneme.ipa}
-                    example={phoneme.example}
-                    accuracy={phoneme.accuracy}
-                    onClick={() => setSelectedPhoneme(phoneme)}
-                  />
-                ))}
-              </div>
-            </div>
-          )
-        })}
+      <div className={compact ? '' : 'h-full flex items-center justify-center'}>
+        <div className={`flex flex-wrap ${compact ? 'gap-2 justify-start' : 'gap-3 justify-center'}`}>
+          {filteredPhonemes.map((phoneme) => (
+            <PhonemeCard
+              key={phoneme.ipa}
+              ipa={phoneme.ipa}
+              example={phoneme.example}
+              accuracy={phoneme.accuracy}
+              onClick={() => setSelectedPhoneme(phoneme)}
+              compact={compact}
+            />
+          ))}
+        </div>
       </div>
 
       <PhonemeDetailDialog

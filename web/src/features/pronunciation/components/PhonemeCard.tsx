@@ -5,6 +5,7 @@ interface PhonemeCardProps {
   example: string
   accuracy: number | null // null = never practiced
   onClick: () => void
+  compact?: boolean
 }
 
 export function PhonemeCard({
@@ -12,6 +13,7 @@ export function PhonemeCard({
   example,
   accuracy,
   onClick,
+  compact = false,
 }: PhonemeCardProps) {
   const getColorClasses = () => {
     if (accuracy === null) {
@@ -41,22 +43,26 @@ export function PhonemeCard({
     <button
       onClick={onClick}
       className={cn(
-        'flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all',
+        'flex flex-col items-center justify-center rounded-xl border-2 transition-all',
         'hover:scale-105 active:scale-95',
-        'min-w-[70px] min-h-[80px]',
+        compact
+          ? 'p-3 min-w-[80px] min-h-[90px]'
+          : 'p-6 min-w-[160px] min-h-[180px]',
         getColorClasses()
       )}
     >
-      <div className="font-mono text-xl font-semibold">/{ipa}/</div>
-      <div className="text-[10px] text-muted-foreground truncate max-w-full">
+      <div className={cn('font-mono font-semibold', compact ? 'text-2xl' : 'text-5xl')}>
+        /{ipa}/
+      </div>
+      <div className={cn('text-muted-foreground truncate max-w-full', compact ? 'text-xs mt-1' : 'text-base mt-2')}>
         {example}
       </div>
       {accuracy !== null ? (
-        <div className={cn('text-sm font-bold mt-1', getAccuracyColor())}>
+        <div className={cn('font-bold', compact ? 'text-sm mt-1' : 'text-xl mt-3', getAccuracyColor())}>
           {accuracy.toFixed(0)}%
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground mt-1">--</div>
+        <div className={cn('text-muted-foreground', compact ? 'text-xs mt-1' : 'text-base mt-3')}>--</div>
       )}
     </button>
   )
