@@ -15,10 +15,6 @@ export function ConversationPage() {
   const [viewMode, setViewMode] = useState<ConversationViewMode>('audio')
   const audioPlayer = useAudioPlayerContext()
 
-  const toggleView = () => {
-    setViewMode((prev) => (prev === 'audio' ? 'messages' : 'audio'))
-  }
-
   const handleRepeat = () => {
     if (audioPlayer.currentUrl) {
       audioPlayer.seek(0)
@@ -55,7 +51,7 @@ export function ConversationPage() {
                   </TooltipContent>
                 </Tooltip>
               )}
-              <ViewToggle currentView={viewMode} onToggle={toggleView} />
+              <ViewToggle value={viewMode} onChange={setViewMode} />
             </div>
           </TooltipProvider>
         )}

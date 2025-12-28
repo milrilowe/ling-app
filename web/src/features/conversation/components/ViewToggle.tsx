@@ -1,34 +1,31 @@
-import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { MessageSquare, Radio } from 'lucide-react'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Mic, MessageSquare } from 'lucide-react'
 import type { ConversationViewMode } from '@/features/conversation/ConversationPage'
 
 interface ViewToggleProps {
-  currentView: ConversationViewMode
-  onToggle: () => void
+  value: ConversationViewMode
+  onChange: (value: ConversationViewMode) => void
 }
 
-export function ViewToggle({ currentView, onToggle }: ViewToggleProps) {
-  const isMessagesView = currentView === 'messages'
-
+export function ViewToggle({ value, onChange }: ViewToggleProps) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onToggle}
-        >
-          {isMessagesView ? (
-            <Radio className="h-5 w-5" />
-          ) : (
-            <MessageSquare className="h-5 w-5" />
-          )}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>{isMessagesView ? 'Switch to audio view' : 'Switch to messages view'}</p>
-      </TooltipContent>
-    </Tooltip>
+    <ToggleGroup
+      type="single"
+      value={value}
+      onValueChange={(val) => {
+        if (val) onChange(val as ConversationViewMode)
+      }}
+      variant="outline"
+      size="sm"
+    >
+      <ToggleGroupItem value="audio" className="gap-1.5">
+        <Mic className="h-4 w-4" />
+        <span>Voice</span>
+      </ToggleGroupItem>
+      <ToggleGroupItem value="messages" className="gap-1.5">
+        <MessageSquare className="h-4 w-4" />
+        <span>Chat</span>
+      </ToggleGroupItem>
+    </ToggleGroup>
   )
 }
