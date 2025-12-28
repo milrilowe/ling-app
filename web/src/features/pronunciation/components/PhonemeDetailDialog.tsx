@@ -1,9 +1,6 @@
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { type CanonicalPhoneme, renderExample } from '@/data/phonemes'
@@ -19,38 +16,27 @@ interface PhonemeDetailDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-interface BreakdownItem {
+interface MistakeItem {
   label: string
   count: number
-  color: string
+  percentage: number
 }
 
-function BreakdownBar({ items, total }: { items: BreakdownItem[]; total: number }) {
-  if (total === 0) return null
-
+function MistakeCard({ item }: { item: MistakeItem }) {
   return (
-    <div className="space-y-2">
-      {items.map((item, idx) => {
-        const percentage = (item.count / total) * 100
-        if (item.count === 0) return null
-
-        return (
-          <div key={idx} className="space-y-1">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-mono">{item.label}</span>
-              <span className="text-muted-foreground">
-                {item.count} ({percentage.toFixed(0)}%)
-              </span>
-            </div>
-            <div className="h-2 w-full rounded-full bg-muted">
-              <div
-                className={cn('h-full rounded-full transition-all', item.color)}
-                style={{ width: `${percentage}%` }}
-              />
-            </div>
-          </div>
-        )
-      })}
+    <div className="rounded-lg border bg-card p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-sm font-medium">{item.label}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {item.count}x
+        </span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-muted/50 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-red-400"
+          style={{ width: `${item.percentage}%` }}
+        />
+      </div>
     </div>
   )
 }
@@ -74,30 +60,31 @@ export function PhonemeDetailDialog({
   const exampleParts = renderExample(phoneme.example, phoneme.highlight)
 
   const getAccuracyColor = (accuracy: number) => {
-    if (accuracy >= 80) return 'text-green-600 dark:text-green-400'
-    if (accuracy >= 60) return 'text-yellow-600 dark:text-yellow-400'
-    if (accuracy >= 40) return 'text-orange-600 dark:text-orange-400'
-    return 'text-red-600 dark:text-red-400'
+    if (accuracy >= 80) return 'text-emerald-500'
+    if (accuracy >= 60) return 'text-yellow-500'
+    if (accuracy >= 40) return 'text-orange-500'
+    return 'text-red-500'
   }
 
-  // Build breakdown items
-  const buildBreakdown = (): BreakdownItem[] => {
+  const getAccuracyBarColor = (accuracy: number) => {
+    if (accuracy >= 80) return 'bg-emerald-500'
+    if (accuracy >= 60) return 'bg-yellow-500'
+    if (accuracy >= 40) return 'bg-orange-500'
+    return 'bg-red-500'
+  }
+
+  // Build mistakes list (deletions + substitutions)
+  const buildMistakes = (): MistakeItem[] => {
     if (!stats) return []
 
-    const items: BreakdownItem[] = [
-      {
-        label: 'Correct',
-        count: stats.correctCount,
-        color: 'bg-green-500',
-      },
-    ]
+    const items: MistakeItem[] = []
 
     // Add deletions if any
     if (stats.deletionCount > 0) {
       items.push({
         label: 'Skipped',
         count: stats.deletionCount,
-        color: 'bg-orange-500',
+        percentage: (stats.deletionCount / stats.totalAttempts) * 100,
       })
     }
 
@@ -106,19 +93,28 @@ export function PhonemeDetailDialog({
       items.push({
         label: `→ /${sub.actualPhoneme}/`,
         count: sub.count,
-        color: 'bg-red-400',
+        percentage: (sub.count / stats.totalAttempts) * 100,
       })
     }
+
+    // Sort by count descending
+    items.sort((a, b) => b.count - a.count)
 
     return items
   }
 
+  const mistakes = buildMistakes()
+  const hasMistakes = mistakes.length > 0
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="font-mono text-4xl text-center flex items-center justify-center gap-2">
-            /{phoneme.ipa}/
+      <DialogContent className="sm:max-w-sm p-0 gap-0 overflow-hidden flex flex-col h-[420px]">
+        {/* Phoneme header - centered */}
+        <div className="px-6 pt-6 pb-4 text-center shrink-0">
+          <div className="inline-flex items-center gap-2">
+            <span className="font-mono text-4xl text-center">
+              /{phoneme.ipa}/
+            </span>
             <Button
               variant="ghost"
               size="icon"
@@ -128,39 +124,62 @@ export function PhonemeDetailDialog({
             >
               <Volume2 className="h-5 w-5" />
             </Button>
-          </DialogTitle>
-          <DialogDescription className="text-center text-base">
-            as in "{exampleParts.before}
-            <span className="font-bold uppercase">{exampleParts.highlighted}</span>
-            {exampleParts.after}"
-          </DialogDescription>
-        </DialogHeader>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2 lowercase">
+            as in "{exampleParts.before}<span className="font-bold text-foreground">{exampleParts.highlighted}</span>{exampleParts.after}"
+          </p>
+        </div>
 
-        <div className="space-y-6 py-4">
+        {/* Accuracy section */}
+        {stats && (
+          <div className="px-6 pb-4 border-b border-border/50 shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-muted-foreground">Accuracy</span>
+              <span className={cn('text-xl font-semibold tabular-nums', getAccuracyColor(stats.accuracy))}>
+                {stats.accuracy.toFixed(0)}%
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-muted/50 overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all', getAccuracyBarColor(stats.accuracy))}
+                style={{ width: `${stats.accuracy}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5 text-right">
+              {stats.correctCount}/{stats.totalAttempts} correct
+            </p>
+          </div>
+        )}
+
+        {/* Mistakes list - scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
           {stats ? (
-            <>
-              {/* Accuracy display */}
-              <div className="text-center">
-                <div className={cn('text-5xl font-bold', getAccuracyColor(stats.accuracy))}>
-                  {stats.accuracy.toFixed(0)}%
-                </div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {stats.totalAttempts} attempts
-                </div>
+            hasMistakes ? (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
+                  Mistakes
+                </p>
+                {mistakes.map((item, idx) => (
+                  <MistakeCard key={idx} item={item} />
+                ))}
               </div>
-
-              {/* Breakdown bars */}
-              <BreakdownBar items={buildBreakdown()} total={stats.totalAttempts} />
-            </>
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">
+                  No mistakes recorded
+                </p>
+              </div>
+            )
           ) : (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-3">🎯</div>
-              <p className="text-muted-foreground">
-                You haven't practiced this sound yet!
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Keep practicing to see your stats.
-              </p>
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                  <Volume2 className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  No practice data yet
+                </p>
+              </div>
             </div>
           )}
         </div>
