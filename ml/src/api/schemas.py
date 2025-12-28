@@ -101,3 +101,43 @@ class HealthResponse(BaseModel):
 
     status: str = Field(default="healthy")
     model_loaded: bool = Field(default=False)
+
+
+# STT Schemas
+
+class TranscribeRequest(BaseModel):
+    """Request body for speech-to-text transcription."""
+
+    audio_url: str = Field(
+        ...,
+        description="Presigned URL to fetch the audio file from MinIO/S3"
+    )
+    language: Optional[str] = Field(
+        default=None,
+        description="Language code (e.g., 'en', 'es'). None for auto-detect."
+    )
+
+
+class TranscribeResponse(BaseModel):
+    """Response body for speech-to-text transcription."""
+
+    status: str = Field(
+        ...,
+        description="Status of the transcription: 'success' or 'error'"
+    )
+    text: Optional[str] = Field(
+        default=None,
+        description="Transcribed text (present when status is 'success')"
+    )
+    language: Optional[str] = Field(
+        default=None,
+        description="Detected or specified language code"
+    )
+    duration: Optional[float] = Field(
+        default=None,
+        description="Audio duration in seconds"
+    )
+    error: Optional[PronunciationError] = Field(
+        default=None,
+        description="Error details (present when status is 'error')"
+    )

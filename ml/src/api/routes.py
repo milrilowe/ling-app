@@ -15,11 +15,14 @@ from .schemas import (
     PronunciationError,
     PhonemeDetail,
     AudioQuality,
+    TranscribeRequest,
+    TranscribeResponse,
 )
 from .audio_fetcher import AudioFetcher
 from src.ipa.audio_to_ipa import WhisperIPAConverter
 from src.ipa.text_to_ipa import GruutIPAConverter
 from src.ipa.aligner import PhonemeAligner
+from src.stt.transcriber import FasterWhisperTranscriber
 
 router = APIRouter()
 
@@ -28,6 +31,7 @@ whisper_converter: Optional[WhisperIPAConverter] = None
 gruut_converter: Optional[GruutIPAConverter] = None
 aligner: Optional[PhonemeAligner] = None
 audio_fetcher: Optional[AudioFetcher] = None
+stt_transcriber: Optional[FasterWhisperTranscriber] = None
 
 
 def get_models_loaded() -> bool:
@@ -43,7 +47,7 @@ def load_models(device: Optional[str] = None, language: str = "en-us"):
         device: Device for Whisper model ('cuda', 'cpu', or None for auto)
         language: Default language for text-to-IPA
     """
-    global whisper_converter, gruut_converter, aligner, audio_fetcher
+    global whisper_converter, gruut_converter, aligner, audio_fetcher, stt_transcriber
 
     print("Loading pronunciation analysis models...")
 
@@ -52,7 +56,10 @@ def load_models(device: Optional[str] = None, language: str = "en-us"):
     aligner = PhonemeAligner()
     audio_fetcher = AudioFetcher()
 
-    print("Models loaded successfully!")
+    print("Loading STT transcriber (faster-whisper)...")
+    stt_transcriber = FasterWhisperTranscriber(model_size="medium", device=device)
+
+    print("All models loaded successfully!")
 
 
 @router.post("/analyze-pronunciation", response_model=PronunciationResponse)
@@ -209,6 +216,78 @@ async def analyze_pronunciation(request: PronunciationRequest) -> PronunciationR
             error=PronunciationError(
                 code="INTERNAL_ERROR",
                 message=f"Unexpected error during analysis: {str(e)}",
+                retryable=True
+            )
+        )
+
+
+@router.post("/transcribe", response_model=TranscribeResponse)
+async def transcribe(request: TranscribeRequest) -> TranscribeResponse:
+    """
+    Transcribe audio to text using faster-whisper.
+
+    This endpoint:
+    1. Downloads audio from the presigned URL
+    2. Transcribes audio to text using faster-whisper
+    3. Returns the transcription with language and duration
+    """
+    if stt_transcriber is None:
+        return TranscribeResponse(
+            status="error",
+            error=PronunciationError(
+                code="MODELS_NOT_LOADED",
+                message="STT model is not loaded. Server may still be starting.",
+                retryable=True
+            )
+        )
+
+    try:
+        # 1. Fetch and load audio
+        try:
+            audio_array, sample_rate, _ = await audio_fetcher.fetch_and_load(
+                request.audio_url,
+                apply_vad=False,  # Let faster-whisper handle VAD
+                normalize=False
+            )
+        except httpx.HTTPStatusError as e:
+            return TranscribeResponse(
+                status="error",
+                error=PronunciationError(
+                    code="AUDIO_DOWNLOAD_FAILED",
+                    message=f"Failed to download audio: HTTP {e.response.status_code}",
+                    retryable=True
+                )
+            )
+        except httpx.RequestError as e:
+            return TranscribeResponse(
+                status="error",
+                error=PronunciationError(
+                    code="AUDIO_DOWNLOAD_FAILED",
+                    message=f"Failed to download audio: {str(e)}",
+                    retryable=True
+                )
+            )
+
+        # 2. Transcribe audio
+        result = stt_transcriber.transcribe(
+            audio_array,
+            sample_rate,
+            language=request.language
+        )
+
+        return TranscribeResponse(
+            status="success",
+            text=result.text,
+            language=result.language,
+            duration=result.duration
+        )
+
+    except Exception as e:
+        return TranscribeResponse(
+            status="error",
+            error=PronunciationError(
+                code="TRANSCRIPTION_ERROR",
+                message=f"Failed to transcribe audio: {str(e)}",
                 retryable=True
             )
         )

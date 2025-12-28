@@ -42,9 +42,8 @@ type Config struct {
 	ElevenLabsAPIKey string
 
 	// S3/MinIO Storage
-	S3Endpoint         string
-	S3InternalEndpoint string // Internal endpoint for Docker-to-Docker communication (e.g., http://minio:9000)
-	S3AccessKey        string
+	S3Endpoint  string
+	S3AccessKey string
 	S3SecretKey        string
 	S3Bucket           string
 	S3Region           string
@@ -96,9 +95,8 @@ func Load() *Config {
 
 		ElevenLabsAPIKey: getEnv("ELEVENLABS_API_KEY", ""),
 
-		S3Endpoint:         getEnv("S3_ENDPOINT", "http://localhost:9000"),
-		S3InternalEndpoint: getEnv("S3_INTERNAL_ENDPOINT", "http://minio:9000"), // For Docker-to-Docker communication
-		S3AccessKey:        getEnv("S3_ACCESS_KEY", "minioadmin"),
+		S3Endpoint:  getEnv("S3_ENDPOINT", "http://localhost:9000"),
+		S3AccessKey: getEnv("S3_ACCESS_KEY", "minioadmin"),
 		S3SecretKey:        getEnv("S3_SECRET_KEY", "minioadmin"),
 		S3Bucket:           getEnv("S3_BUCKET", "ling-app-audio"),
 		S3Region:           getEnv("S3_REGION", "us-east-1"),

@@ -231,16 +231,16 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 		return
 	}
 
-	// Reopen file for transcription (file was consumed by upload)
-	file, err = fileHeader.Open()
+	// Get presigned URL for ML service to access the audio
+	audioPresignedURL, err := h.Storage.GetPresignedURL(ctx, userAudioKey, 5*time.Minute)
 	if err != nil {
+		log.Printf("Error getting presigned URL: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process audio"})
 		return
 	}
-	defer file.Close()
 
-	// Transcribe audio using Whisper
-	transcription, err := h.WhisperClient.Transcribe(ctx, file, fileHeader.Filename)
+	// Transcribe audio using local Whisper via ML service
+	transcription, err := h.WhisperClient.TranscribeFromURL(ctx, audioPresignedURL)
 	if err != nil {
 		log.Printf("Error transcribing audio: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to transcribe audio"})

@@ -50,7 +50,6 @@ func main() {
 	// Initialize storage service
 	storageService, err := services.NewStorageService(
 		cfg.S3Endpoint,
-		cfg.S3InternalEndpoint, // Internal endpoint for Docker-to-Docker communication (e.g., MFA -> MinIO)
 		cfg.S3AccessKey,
 		cfg.S3SecretKey,
 		cfg.S3Bucket,
@@ -72,7 +71,7 @@ func main() {
 
 	// Initialize AI clients
 	openAIClient := services.NewOpenAIClient(cfg.OpenAIAPIKey)
-	whisperClient := services.NewWhisperClient(cfg.OpenAIAPIKey)
+	whisperClient := services.NewWhisperClient(cfg.MLServiceURL) // Uses local faster-whisper via ML service
 	elevenLabsClient := services.NewElevenLabsClient(cfg.ElevenLabsAPIKey)
 
 	// Initialize ML client for pronunciation analysis
