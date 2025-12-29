@@ -4,6 +4,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { type CanonicalPhoneme, renderExample } from '@/data/phonemes'
+import { getIpaSoundUrl } from '@/data/ipa-sounds'
 import type { PhonemeAccuracy, SubstitutionPattern } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Volume2 } from 'lucide-react'
@@ -18,15 +19,39 @@ interface PhonemeDetailDialogProps {
 
 interface MistakeItem {
   label: string
+  phoneme: string | null // IPA symbol if it's a substitution, null if deletion
   count: number
   percentage: number
 }
 
 function MistakeCard({ item }: { item: MistakeItem }) {
+  const audioUrl = item.phoneme ? getIpaSoundUrl(item.phoneme) : null
+
+  const playSound = () => {
+    if (audioUrl) {
+      const audio = new Audio(audioUrl)
+      audio.play().catch((err) => {
+        console.error('Failed to play sound:', err)
+      })
+    }
+  }
+
   return (
     <div className="rounded-lg border bg-card p-3 space-y-2">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-sm font-medium">{item.label}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-sm font-medium">{item.label}</span>
+          {audioUrl && (
+            <button
+              type="button"
+              onClick={playSound}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title={`Hear /${item.phoneme}/`}
+            >
+              <Volume2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
         <span className="text-xs text-muted-foreground tabular-nums">
           {item.count}x
         </span>
@@ -57,6 +82,18 @@ export function PhonemeDetailDialog({
     })
   }
 
+  const playIsolatedSound = () => {
+    const url = getIpaSoundUrl(phoneme.ipa)
+    if (url) {
+      const audio = new Audio(url)
+      audio.play().catch((err) => {
+        console.error('Failed to play isolated sound:', err)
+      })
+    }
+  }
+
+  const hasIsolatedSound = !!getIpaSoundUrl(phoneme.ipa)
+
   const exampleParts = renderExample(phoneme.example, phoneme.highlight)
 
   const getAccuracyColor = (accuracy: number) => {
@@ -83,6 +120,7 @@ export function PhonemeDetailDialog({
     if (stats.deletionCount > 0) {
       items.push({
         label: 'Skipped',
+        phoneme: null,
         count: stats.deletionCount,
         percentage: (stats.deletionCount / stats.totalAttempts) * 100,
       })
@@ -92,6 +130,7 @@ export function PhonemeDetailDialog({
     for (const sub of substitutions) {
       items.push({
         label: `→ /${sub.actualPhoneme}/`,
+        phoneme: sub.actualPhoneme,
         count: sub.count,
         percentage: (sub.count / stats.totalAttempts) * 100,
       })
@@ -115,18 +154,29 @@ export function PhonemeDetailDialog({
             <span className="font-mono text-4xl text-center">
               /{phoneme.ipa}/
             </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={playExampleAudio}
-              className="h-10 w-10"
-              title={`Hear "${phoneme.example}"`}
-            >
-              <Volume2 className="h-5 w-5" />
-            </Button>
+            {hasIsolatedSound && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={playIsolatedSound}
+                className="h-10 w-10"
+                title="Hear isolated sound"
+              >
+                <Volume2 className="h-5 w-5" />
+              </Button>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-2 lowercase">
-            as in "{exampleParts.before}<span className="font-bold text-foreground">{exampleParts.highlighted}</span>{exampleParts.after}"
+            as in "
+            <button
+              type="button"
+              onClick={playExampleAudio}
+              className="hover:underline cursor-pointer"
+              title={`Hear "${phoneme.example}"`}
+            >
+              {exampleParts.before}<span className="font-bold text-foreground">{exampleParts.highlighted}</span>{exampleParts.after}
+            </button>
+            "
           </p>
         </div>
 
