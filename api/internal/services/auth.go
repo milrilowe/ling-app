@@ -78,6 +78,7 @@ func (s *AuthService) GenerateSessionToken() (string, error) {
 
 // CreateUser registers a new user with email and password.
 // Returns the created user or an error if email is already taken.
+// NOTE: This does NOT initialize credits. Use CreateUserWithCredits for new registrations.
 func (s *AuthService) CreateUser(email, password, name string) (*models.User, error) {
 	// Check if email already exists
 	var existing models.User
@@ -106,6 +107,46 @@ func (s *AuthService) CreateUser(email, password, name string) (*models.User, er
 		return nil, err
 	}
 
+	return user, nil
+}
+
+// CreateUserWithCredits registers a new user and initializes their credits atomically.
+// Both operations happen in a single transaction - if either fails, both roll back.
+func (s *AuthService) CreateUserWithCredits(email, password, name string, creditsService *CreditsService) (*models.User, error) {
+	var user *models.User
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Check if email already exists
+		var existing models.User
+		if err := tx.Where("email = ?", email).First(&existing).Error; err == nil {
+			return ErrEmailTaken
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		// Hash the password
+		hash, err := s.HashPassword(password)
+		if err != nil {
+			return err
+		}
+
+		// Create user
+		user = &models.User{
+			Email:        email,
+			PasswordHash: &hash,
+			Name:         name,
+		}
+		if err := tx.Create(user).Error; err != nil {
+			return err
+		}
+
+		// Initialize credits
+		return creditsService.InitializeCreditsWithTx(tx, user.ID, models.TierFree)
+	})
+
+	if err != nil {
+		return nil, err
+	}
 	return user, nil
 }
 
@@ -196,7 +237,9 @@ func (s *AuthService) CleanupExpiredSessions() (int64, error) {
 // FindOrCreateOAuthUser finds an existing user by OAuth provider ID,
 // or creates a new user if one doesn't exist.
 // This is used when a user logs in via Google or GitHub.
-func (s *AuthService) FindOrCreateOAuthUser(provider, providerID, email, name, avatarURL string) (*models.User, error) {
+// Returns: user, isNewUser (true if user was just created), error
+// For new users, credits are initialized atomically in the same transaction.
+func (s *AuthService) FindOrCreateOAuthUser(provider, providerID, email, name, avatarURL string, creditsService *CreditsService) (*models.User, bool, error) {
 	var user models.User
 	var err error
 
@@ -207,16 +250,16 @@ func (s *AuthService) FindOrCreateOAuthUser(provider, providerID, email, name, a
 	case "github":
 		err = s.db.Where("github_id = ?", providerID).First(&user).Error
 	default:
-		return nil, errors.New("unknown OAuth provider")
+		return nil, false, errors.New("unknown OAuth provider")
 	}
 
 	// Found existing user by OAuth ID
 	if err == nil {
-		return &user, nil
+		return &user, false, nil
 	}
 
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err // Database error
+		return nil, false, err // Database error
 	}
 
 	// Try to find by email (user might have registered with email first)
@@ -233,36 +276,45 @@ func (s *AuthService) FindOrCreateOAuthUser(provider, providerID, email, name, a
 			user.AvatarURL = &avatarURL
 		}
 		if err := s.db.Save(&user).Error; err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		return &user, nil
+		return &user, false, nil
 	}
 
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err // Database error
+		return nil, false, err // Database error
 	}
 
-	// Create new user
-	user = models.User{
-		Email:         email,
-		Name:          name,
-		EmailVerified: true, // OAuth providers verify email
+	// Create new user with credits in a transaction
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		user = models.User{
+			Email:         email,
+			Name:          name,
+			EmailVerified: true, // OAuth providers verify email
+		}
+
+		if avatarURL != "" {
+			user.AvatarURL = &avatarURL
+		}
+
+		switch provider {
+		case "google":
+			user.GoogleID = &providerID
+		case "github":
+			user.GitHubID = &providerID
+		}
+
+		if err := tx.Create(&user).Error; err != nil {
+			return err
+		}
+
+		// Initialize credits for new user
+		return creditsService.InitializeCreditsWithTx(tx, user.ID, models.TierFree)
+	})
+
+	if err != nil {
+		return nil, false, err
 	}
 
-	if avatarURL != "" {
-		user.AvatarURL = &avatarURL
-	}
-
-	switch provider {
-	case "google":
-		user.GoogleID = &providerID
-	case "github":
-		user.GitHubID = &providerID
-	}
-
-	if err := s.db.Create(&user).Error; err != nil {
-		return nil, err
-	}
-
-	return &user, nil
+	return &user, true, nil
 }

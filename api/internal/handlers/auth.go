@@ -16,17 +16,19 @@ import (
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	AuthService  *services.AuthService
-	OAuthService *services.OAuthService
-	Config       *config.Config
+	AuthService    *services.AuthService
+	OAuthService   *services.OAuthService
+	CreditsService *services.CreditsService
+	Config         *config.Config
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(authService *services.AuthService, oauthService *services.OAuthService, cfg *config.Config) *AuthHandler {
+func NewAuthHandler(authService *services.AuthService, oauthService *services.OAuthService, creditsService *services.CreditsService, cfg *config.Config) *AuthHandler {
 	return &AuthHandler{
-		AuthService:  authService,
-		OAuthService: oauthService,
-		Config:       cfg,
+		AuthService:    authService,
+		OAuthService:   oauthService,
+		CreditsService: creditsService,
+		Config:         cfg,
 	}
 }
 
@@ -105,8 +107,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	name := strings.TrimSpace(req.Name)
 
-	// Create user
-	user, err := h.AuthService.CreateUser(email, req.Password, name)
+	// Create user with credits (atomic transaction)
+	user, err := h.AuthService.CreateUserWithCredits(email, req.Password, name, h.CreditsService)
 	if err != nil {
 		if err == services.ErrEmailTaken {
 			c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
@@ -300,13 +302,14 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// Find or create user
-	user, err := h.AuthService.FindOrCreateOAuthUser(
+	// Find or create user (credits initialized atomically for new users)
+	user, _, err := h.AuthService.FindOrCreateOAuthUser(
 		"google",
 		googleUser.ID,
 		googleUser.Email,
 		googleUser.Name,
 		googleUser.Picture,
+		h.CreditsService,
 	)
 	if err != nil {
 		c.Redirect(http.StatusTemporaryRedirect, h.Config.FrontendURL+"/login?error=account_error")
@@ -387,13 +390,14 @@ func (h *AuthHandler) GitHubCallback(c *gin.Context) {
 		name = githubUser.Login
 	}
 
-	// Find or create user
-	user, err := h.AuthService.FindOrCreateOAuthUser(
+	// Find or create user (credits initialized atomically for new users)
+	user, _, err := h.AuthService.FindOrCreateOAuthUser(
 		"github",
 		githubID,
 		githubUser.Email,
 		name,
 		githubUser.AvatarURL,
+		h.CreditsService,
 	)
 	if err != nil {
 		c.Redirect(http.StatusTemporaryRedirect, h.Config.FrontendURL+"/login?error=account_error")

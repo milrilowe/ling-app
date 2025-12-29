@@ -163,6 +163,11 @@ func (s *CreditsService) RefreshMonthlyCredits(userID uuid.UUID) error {
 
 // InitializeCredits creates a credits record for a new user
 func (s *CreditsService) InitializeCredits(userID uuid.UUID, tier models.SubscriptionTier) error {
+	return s.InitializeCreditsWithTx(s.db.DB, userID, tier)
+}
+
+// InitializeCreditsWithTx creates a credits record using an existing transaction
+func (s *CreditsService) InitializeCreditsWithTx(tx *gorm.DB, userID uuid.UUID, tier models.SubscriptionTier) error {
 	allowance := models.TierCredits[tier]
 	if allowance == 0 {
 		allowance = models.TierCredits[models.TierFree]
@@ -176,7 +181,7 @@ func (s *CreditsService) InitializeCredits(userID uuid.UUID, tier models.Subscri
 		LastRefreshedAt:  time.Now(),
 	}
 
-	if err := s.db.Create(&credits).Error; err != nil {
+	if err := tx.Create(&credits).Error; err != nil {
 		return fmt.Errorf("failed to initialize credits: %w", err)
 	}
 	return nil

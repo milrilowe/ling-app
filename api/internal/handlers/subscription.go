@@ -39,20 +39,8 @@ func (h *SubscriptionHandler) GetSubscriptionStatus(c *gin.Context) {
 
 	credits, err := h.creditsService.GetCredits(user.ID)
 	if err != nil {
-		if errors.Is(err, services.ErrCreditsNotFound) {
-			if err := h.creditsService.InitializeCredits(user.ID, sub.Tier); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize credits"})
-				return
-			}
-			credits, err = h.creditsService.GetCredits(user.ID)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get credits"})
-				return
-			}
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get credits"})
-			return
-		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get credits"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -112,16 +100,8 @@ func (h *SubscriptionHandler) GetCreditsBalance(c *gin.Context) {
 
 	credits, err := h.creditsService.GetCredits(user.ID)
 	if err != nil {
-		if errors.Is(err, services.ErrCreditsNotFound) {
-			if err := h.creditsService.InitializeCredits(user.ID, models.TierFree); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize credits"})
-				return
-			}
-			credits, _ = h.creditsService.GetCredits(user.ID)
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get credits"})
-			return
-		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get credits"})
+		return
 	}
 
 	c.JSON(http.StatusOK, credits)

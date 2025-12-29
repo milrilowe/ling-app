@@ -88,7 +88,7 @@ func main() {
 	stripeService := services.NewStripeService(cfg, database, creditsService)
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(authService, oauthService, cfg)
+	authHandler := handlers.NewAuthHandler(authService, oauthService, creditsService, cfg)
 	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, ttsClient, pronunciationWorker, creditsService, cfg.MaxAudioFileSize)
 	audioHandler := handlers.NewAudioHandler(storageService)
 	subscriptionHandler := handlers.NewSubscriptionHandler(stripeService, creditsService)
