@@ -1,0 +1,21 @@
+name: ML CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['ml/**']
+  pull_request:
+    paths: ['ml/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f Dockerfile.mfa -t ling-ml:test .
+        working-directory: ml
+
+      # TODO: Add push to ECR + deploy to ECS GPU
