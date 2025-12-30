@@ -1,120 +1,90 @@
-# Ling App - Language Learning Platform
+# Ling App
 
 A conversational language learning app where users practice speaking through realistic dialogues. The system analyzes pronunciation at the phoneme level and provides intelligent feedback.
 
-## Architecture
-
-```
-Web (Vite + React + TanStack Router) → API (Go) → ML (FastAPI/Python)
-```
-
-- **Web**: Frontend application built with Vite, React, TanStack Router, and shadcn/ui
-- **API**: Go backend handling business logic, auth, and database
-- **ML**: Python FastAPI service for speech analysis (Whisper, OpenAI, ElevenLabs)
-
-## Tech Stack
-
-- **Frontend**: Vite 7.2, React 19, TanStack Router, shadcn/ui, Tailwind CSS
-- **API**: Go 1.25, Gin web framework
-- **ML**: Python 3.12, FastAPI, Whisper, OpenAI, ElevenLabs
-- **Database**: PostgreSQL
-- **Session Storage**: PostgreSQL-backed sessions
-
-## Project Structure
-
-```
-ling-app/
-├── web/                    # Frontend (Vite + React)
-│   └── src/
-│       ├── routes/         # TanStack Router file-based routes
-│       ├── features/       # Feature modules (conversation, chat, home)
-│       ├── components/     # Shared components
-│       ├── hooks/          # Custom React hooks
-│       └── lib/            # Utilities
-├── api/                    # Go API
-│   ├── cmd/server/         # Main entry point
-│   └── internal/
-│       ├── config/         # Configuration
-│       ├── handlers/       # HTTP handlers
-│       ├── middleware/     # Middleware
-│       ├── models/         # Data models
-│       ├── services/       # Business logic (ML client, OpenAI, ElevenLabs)
-│       └── db/             # Database and migrations
-├── ml/                     # Python ML service
-│   ├── src/
-│   │   ├── api/            # FastAPI routes
-│   │   ├── audio/          # Audio loading and preprocessing
-│   │   ├── ipa/            # IPA conversion and alignment
-│   │   └── models/         # Whisper model management
-│   └── cli.py              # CLI interface
-└── docker-compose.yml      # Development services
-```
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+ and pnpm
 - Go 1.25+
-- Python 3.12+
-- PostgreSQL (or use Docker)
+- Python 3.11+ (3.12 not fully tested with gruut)
+- Docker (for dev infrastructure)
 
-### Setup
+### 1. Start Infrastructure
 
-1. **Start development database:**
-   ```bash
-   docker-compose up -d
-   ```
+Docker Compose runs PostgreSQL and MinIO (S3-compatible storage) for development:
 
-2. **Set up environment variables:**
+```bash
+docker-compose up -d
+```
 
-   Copy example env files and fill in your API keys:
-   ```bash
-   cp web/example.env.local web/.env.local
-   cp api/example.env api/.env
-   cp ml/example.env ml/.env
-   ```
+### 2. Environment Setup
 
-3. **Web (Frontend):**
-   ```bash
-   cd web
-   pnpm install
-   pnpm dev  # Runs on http://localhost:3000
-   ```
+```bash
+cp web/example.env.local web/.env.local
+cp api/example.env api/.env
+cp ml/example.env ml/.env
+```
 
-4. **API (Go Backend):**
-   ```bash
-   cd api
-   go mod download
-   go run cmd/server/main.go  # Runs on http://localhost:8080
-   ```
+Fill in your API keys (see each package's README for details).
 
-5. **ML Service (Python):**
-   ```bash
-   cd ml
-   python -m venv .venv
-   source .venv/bin/activate  # or `.venv\Scripts\activate` on Windows
-   pip install -r requirements.txt
-   uvicorn src.api.main:app --reload  # Runs on http://localhost:8000
-   ```
+### 3. Run Services
 
-## Development
+Run each service in a separate terminal:
 
-### API Endpoints
+**Terminal 1 - Web** (http://localhost:3000)
+```bash
+cd web
+pnpm install
+pnpm dev
+```
 
-**API Service (Go)**
-- `GET /health` - Health check
-- `POST /api/threads` - Create conversation thread
-- `GET /api/threads/:id` - Get thread with messages
-- `POST /api/audio/message` - Send audio message
+**Terminal 2 - API** (http://localhost:8080)
+```bash
+cd api
+go run cmd/server/main.go
+```
 
-**ML Service (Python)**
-- `GET /health` - Health check
-- `POST /analyze` - Analyze pronunciation (audio vs expected text)
+**Terminal 3 - ML** (http://localhost:8000)
+```bash
+cd ml
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+pip install gruut[en]
+uvicorn src.api.main:app --reload
+```
 
-### Environment Variables
+## Architecture
 
-See `example.env` files in each service directory for required configuration.
+```
+Web (React + Vite) → API (Go) → ML (Python/FastAPI)
+                         ↓
+                    PostgreSQL
+                      MinIO
+```
+
+- **Web**: Frontend with push-to-talk audio recording and conversation UI
+- **API**: Go backend handling auth, conversations, and orchestrating services
+- **ML**: Python service providing TTS, STT, and pronunciation analysis
+
+## Project Structure
+
+```
+ling-app/
+├── web/                    # React frontend (Vite, TypeScript, TanStack Router)
+├── api/                    # Go backend (Gin, GORM, PostgreSQL)
+├── ml/                     # Python ML service (FastAPI, Whisper, gruut)
+├── scripts/                # Utility scripts
+└── docker-compose.yml      # Dev infrastructure (PostgreSQL, MinIO)
+```
+
+## Service Documentation
+
+- [Web README](web/README.md) - React frontend
+- [API README](api/README.md) - Go backend
+- [ML README](ml/README.md) - Python speech service
 
 ## License
 

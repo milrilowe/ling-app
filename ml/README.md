@@ -523,7 +523,7 @@ This version includes **11 major accuracy improvements** over the baseline:
 ## Context: Integration with Main API
 
 This service is part of a larger system:
-- **Main Web API**: Takes ChatGPT responses → converts to audio via ElevenLabs
+- **Main Web API**: Takes ChatGPT responses → converts to audio via ML service TTS
 - **Future feature**: MFA integration for karaoke-style playback (word highlighting with timing)
 - **This service**: Pronunciation comparison (audio IPA vs expected IPA) - NO timing needed
 
