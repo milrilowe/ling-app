@@ -12,18 +12,19 @@ import (
 	"ling-app/api/internal/config"
 	"ling-app/api/internal/middleware"
 	"ling-app/api/internal/services"
+	"ling-app/api/internal/services/auth"
 )
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	AuthService    *services.AuthService
+	AuthService    *auth.AuthService
 	OAuthService   *services.OAuthService
 	CreditsService *services.CreditsService
 	Config         *config.Config
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(authService *services.AuthService, oauthService *services.OAuthService, creditsService *services.CreditsService, cfg *config.Config) *AuthHandler {
+func NewAuthHandler(authService *auth.AuthService, oauthService *services.OAuthService, creditsService *services.CreditsService, cfg *config.Config) *AuthHandler {
 	return &AuthHandler{
 		AuthService:    authService,
 		OAuthService:   oauthService,
@@ -108,9 +109,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	name := strings.TrimSpace(req.Name)
 
 	// Create user with credits (atomic transaction)
-	user, err := h.AuthService.CreateUserWithCredits(email, req.Password, name, h.CreditsService)
+	user, err := h.AuthService.CreateUser(email, req.Password, name, h.CreditsService)
 	if err != nil {
-		if err == services.ErrEmailTaken {
+		if err == auth.ErrEmailTaken {
 			c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
 			return
 		}
@@ -153,7 +154,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Authenticate
 	user, err := h.AuthService.AuthenticateUser(email, req.Password)
 	if err != nil {
-		if err == services.ErrInvalidCredentials {
+		if err == auth.ErrInvalidCredentials {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 			return
 		}

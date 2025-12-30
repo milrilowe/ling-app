@@ -6,12 +6,15 @@ import (
 	"os"
 	"time"
 
+	"ling-app/api/internal/client"
 	"ling-app/api/internal/config"
 	"ling-app/api/internal/db"
 	"ling-app/api/internal/handlers"
 	"ling-app/api/internal/middleware"
 	"ling-app/api/internal/models"
+	"ling-app/api/internal/repository"
 	"ling-app/api/internal/services"
+	"ling-app/api/internal/services/auth"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,12 +46,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize repositories
+	userRepo := repository.NewUserRepository()
+	sessionRepo := repository.NewSessionRepository()
+	creditsRepo := repository.NewCreditsRepository()
+	creditTxRepo := repository.NewCreditTransactionRepository()
+	threadRepo := repository.NewThreadRepository()
+	messageRepo := repository.NewMessageRepository()
+
 	// Initialize auth services
-	authService := services.NewAuthService(database, cfg.SessionMaxAge)
+	authService := auth.NewAuthService(database, userRepo, sessionRepo, cfg.SessionMaxAge)
 	oauthService := services.NewOAuthService(cfg)
 
-	// Initialize storage service
-	storageService, err := services.NewStorageService(
+	// Initialize storage client
+	storageClient, err := client.NewStorageClient(
 		cfg.S3Endpoint,
 		cfg.S3AccessKey,
 		cfg.S3SecretKey,
@@ -56,41 +67,44 @@ func main() {
 		cfg.S3Region,
 	)
 	if err != nil {
-		log.Fatal("Failed to initialize storage service:", err)
+		log.Fatal("Failed to initialize storage client:", err)
 		os.Exit(1)
 	}
 
 	// Ensure MinIO bucket exists
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := storageService.EnsureBucketExists(ctx); err != nil {
+	if err := storageClient.EnsureBucketExists(ctx); err != nil {
 		log.Printf("Warning: Failed to ensure bucket exists: %v", err)
 	} else {
 		log.Printf("Storage bucket '%s' is ready", cfg.S3Bucket)
 	}
 
 	// Initialize AI clients
-	openAIClient := services.NewOpenAIClient(cfg.OpenAIAPIKey)
-	whisperClient := services.NewWhisperClient(cfg.MLServiceURL) // Uses local faster-whisper via ML service
-	ttsClient := services.NewTTSClient(cfg.MLServiceURL)         // Uses local Chatterbox TTS via ML service
+	openAIClient := client.NewOpenAIClient(cfg.OpenAIAPIKey)
+	whisperClient := client.NewWhisperClient(cfg.MLServiceURL) // Uses local faster-whisper via ML service
+	ttsClient := client.NewTTSClient(cfg.MLServiceURL)         // Uses local Chatterbox TTS via ML service
 
 	// Initialize ML client for pronunciation analysis
-	mlClient := services.NewMLClient(cfg.MLServiceURL, time.Duration(cfg.MLServiceTimeout)*time.Second)
+	mlClient := client.NewMLClient(cfg.MLServiceURL, time.Duration(cfg.MLServiceTimeout)*time.Second)
 
-	// Initialize phoneme stats service
-	phonemeStatsService := services.NewPhonemeStatsService(database)
+	// Initialize phoneme stats repositories and service
+	phonemeStatsRepo := repository.NewPhonemeStatsRepository()
+	phonemeSubsRepo := repository.NewPhonemeSubstitutionRepository()
+	phonemeStatsService := services.NewPhonemeStatsService(database, phonemeStatsRepo, phonemeSubsRepo)
 
 	// Initialize pronunciation worker
-	pronunciationWorker := services.NewPronunciationWorker(database, mlClient, storageService, phonemeStatsService)
+	pronunciationWorker := services.NewPronunciationWorker(database, mlClient, storageClient, phonemeStatsService)
 
 	// Initialize credits and subscription services
-	creditsService := services.NewCreditsService(database)
-	stripeService := services.NewStripeService(cfg, database, creditsService)
+	creditsService := services.NewCreditsService(database, creditsRepo, creditTxRepo)
+	subscriptionRepo := repository.NewSubscriptionRepository()
+	stripeService := services.NewStripeService(cfg, database, subscriptionRepo, creditsService)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, oauthService, creditsService, cfg)
-	threadHandler := handlers.NewThreadHandler(database, openAIClient, storageService, whisperClient, ttsClient, pronunciationWorker, creditsService, cfg.MaxAudioFileSize)
-	audioHandler := handlers.NewAudioHandler(storageService)
+	threadHandler := handlers.NewThreadHandler(database.DB, threadRepo, messageRepo, openAIClient, storageClient, whisperClient, ttsClient, pronunciationWorker, creditsService, cfg.MaxAudioFileSize)
+	audioHandler := handlers.NewAudioHandler(storageClient)
 	subscriptionHandler := handlers.NewSubscriptionHandler(stripeService, creditsService)
 	phonemeStatsHandler := handlers.NewPhonemeStatsHandler(phonemeStatsService)
 

@@ -1,4 +1,4 @@
-package services
+package client
 
 import (
 	"bytes"
@@ -11,38 +11,15 @@ import (
 	"time"
 )
 
-type TTSClient struct {
+// ttsClient implements TTSClient using HTTP calls to the ML service.
+type ttsClient struct {
 	mlServiceURL string
 	httpClient   *http.Client
 }
 
-type TTSResult struct {
-	AudioBytes []byte
-	Duration   float64
-}
-
-// synthesizeRequest is the request body for the ML service /api/v1/synthesize endpoint
-type synthesizeRequest struct {
-	Text         string  `json:"text"`
-	Exaggeration float64 `json:"exaggeration"`
-	Format       string  `json:"format"`
-}
-
-// synthesizeResponse is the response from the ML service
-type synthesizeResponse struct {
-	Status      string  `json:"status"`
-	AudioBase64 *string `json:"audio_base64,omitempty"`
-	Duration    *float64 `json:"duration,omitempty"`
-	Format      *string `json:"format,omitempty"`
-	Error       *struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-	} `json:"error,omitempty"`
-}
-
-// NewTTSClient creates a new TTS client that uses the ML service
-func NewTTSClient(mlServiceURL string) *TTSClient {
-	return &TTSClient{
+// NewTTSClient creates a new TTS client that uses the ML service.
+func NewTTSClient(mlServiceURL string) TTSClient {
+	return &ttsClient{
 		mlServiceURL: mlServiceURL,
 		httpClient: &http.Client{
 			Timeout: 60 * time.Second, // 1 minute timeout for TTS
@@ -50,13 +27,32 @@ func NewTTSClient(mlServiceURL string) *TTSClient {
 	}
 }
 
-// Synthesize generates speech from text using the ML service
-func (t *TTSClient) Synthesize(ctx context.Context, text string) (*TTSResult, error) {
+// synthesizeRequest is the request body for the ML service /api/v1/synthesize endpoint.
+type synthesizeRequest struct {
+	Text         string  `json:"text"`
+	Exaggeration float64 `json:"exaggeration"`
+	Format       string  `json:"format"`
+}
+
+// synthesizeResponse is the response from the ML service.
+type synthesizeResponse struct {
+	Status      string   `json:"status"`
+	AudioBase64 *string  `json:"audio_base64,omitempty"`
+	Duration    *float64 `json:"duration,omitempty"`
+	Format      *string  `json:"format,omitempty"`
+	Error       *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+}
+
+// Synthesize generates speech from text using the ML service.
+func (t *ttsClient) Synthesize(ctx context.Context, text string) (*TTSResult, error) {
 	return t.SynthesizeWithOptions(ctx, text, 0.5, "mp3")
 }
 
-// SynthesizeWithOptions generates speech with custom options
-func (t *TTSClient) SynthesizeWithOptions(ctx context.Context, text string, exaggeration float64, format string) (*TTSResult, error) {
+// SynthesizeWithOptions generates speech with custom options.
+func (t *ttsClient) SynthesizeWithOptions(ctx context.Context, text string, exaggeration float64, format string) (*TTSResult, error) {
 	reqBody := synthesizeRequest{
 		Text:         text,
 		Exaggeration: exaggeration,

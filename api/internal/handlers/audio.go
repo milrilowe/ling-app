@@ -6,16 +6,16 @@ import (
 	"net/http"
 	"time"
 
-	"ling-app/api/internal/services"
+	"ling-app/api/internal/client"
 
 	"github.com/gin-gonic/gin"
 )
 
 type AudioHandler struct {
-	Storage *services.StorageService
+	Storage client.StorageClient
 }
 
-func NewAudioHandler(storage *services.StorageService) *AudioHandler {
+func NewAudioHandler(storage client.StorageClient) *AudioHandler {
 	return &AudioHandler{
 		Storage: storage,
 	}

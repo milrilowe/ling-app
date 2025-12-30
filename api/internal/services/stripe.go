@@ -9,6 +9,7 @@ import (
 	"ling-app/api/internal/config"
 	"ling-app/api/internal/db"
 	"ling-app/api/internal/models"
+	"ling-app/api/internal/repository"
 
 	"github.com/google/uuid"
 	"github.com/stripe/stripe-go/v82"
@@ -27,29 +28,39 @@ var (
 type StripeService struct {
 	config         *config.Config
 	db             *db.DB
+	exec           repository.Executor
+	txRunner       TxRunner
+	subRepo        repository.SubscriptionRepository
 	creditsService *CreditsService
 }
 
-func NewStripeService(cfg *config.Config, database *db.DB, creditsService *CreditsService) *StripeService {
+func NewStripeService(
+	cfg *config.Config,
+	database *db.DB,
+	subRepo repository.SubscriptionRepository,
+	creditsService *CreditsService,
+) *StripeService {
 	stripe.Key = cfg.StripeSecretKey
 	return &StripeService{
 		config:         cfg,
 		db:             database,
+		exec:           database.DB,
+		txRunner:       database.DB,
+		subRepo:        subRepo,
 		creditsService: creditsService,
 	}
 }
 
 // GetSubscription retrieves a user's subscription record
 func (s *StripeService) GetSubscription(userID uuid.UUID) (*models.Subscription, error) {
-	var sub models.Subscription
-	err := s.db.Where("user_id = ?", userID).First(&sub).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	sub, err := s.subRepo.FindByUserID(s.exec, userID)
+	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrSubscriptionNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get subscription: %w", err)
 	}
-	return &sub, nil
+	return sub, nil
 }
 
 // GetOrCreateSubscription returns existing or creates a new free subscription
@@ -79,7 +90,7 @@ func (s *StripeService) GetOrCreateSubscription(userID uuid.UUID, email, name st
 		Tier:             models.TierFree,
 		Status:           "active",
 	}
-	if err := s.db.Create(sub).Error; err != nil {
+	if err := s.subRepo.Create(s.exec, sub); err != nil {
 		return nil, fmt.Errorf("create subscription: %w", err)
 	}
 
@@ -205,9 +216,9 @@ func (s *StripeService) handleCheckoutCompleted(data json.RawMessage) error {
 	}
 	tier := models.SubscriptionTier(tierStr)
 
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		var sub models.Subscription
-		if err := tx.Where("user_id = ?", userID).First(&sub).Error; err != nil {
+	return s.txRunner.Transaction(func(tx *gorm.DB) error {
+		sub, err := s.subRepo.FindByUserID(tx, userID)
+		if err != nil {
 			return fmt.Errorf("find subscription: %w", err)
 		}
 
@@ -221,7 +232,7 @@ func (s *StripeService) handleCheckoutCompleted(data json.RawMessage) error {
 		sub.Tier = tier
 		sub.Status = "active"
 
-		if err := tx.Save(&sub).Error; err != nil {
+		if err := s.subRepo.Save(tx, sub); err != nil {
 			return fmt.Errorf("update subscription: %w", err)
 		}
 
@@ -246,12 +257,12 @@ func (s *StripeService) handleSubscriptionUpdated(data json.RawMessage) error {
 		return fmt.Errorf("unmarshal subscription: %w", err)
 	}
 
-	var sub models.Subscription
-	if err := s.db.Where("stripe_subscription_id = ?", stripeSub.ID).First(&sub).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("Subscription not found for stripe_subscription_id: %s", stripeSub.ID)
-			return nil // Not an error - might be from another system
-		}
+	sub, err := s.subRepo.FindByStripeSubscriptionID(s.exec, stripeSub.ID)
+	if errors.Is(err, repository.ErrNotFound) {
+		log.Printf("Subscription not found for stripe_subscription_id: %s", stripeSub.ID)
+		return nil // Not an error - might be from another system
+	}
+	if err != nil {
 		return fmt.Errorf("find subscription: %w", err)
 	}
 
@@ -275,7 +286,7 @@ func (s *StripeService) handleSubscriptionUpdated(data json.RawMessage) error {
 		}
 	}
 
-	return s.db.Save(&sub).Error
+	return s.subRepo.Save(s.exec, sub)
 }
 
 func (s *StripeService) handleSubscriptionDeleted(data json.RawMessage) error {
@@ -284,11 +295,11 @@ func (s *StripeService) handleSubscriptionDeleted(data json.RawMessage) error {
 		return fmt.Errorf("unmarshal subscription: %w", err)
 	}
 
-	var sub models.Subscription
-	if err := s.db.Where("stripe_subscription_id = ?", stripeSub.ID).First(&sub).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
+	sub, err := s.subRepo.FindByStripeSubscriptionID(s.exec, stripeSub.ID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("find subscription: %w", err)
 	}
 
@@ -298,7 +309,7 @@ func (s *StripeService) handleSubscriptionDeleted(data json.RawMessage) error {
 	sub.StripeSubscriptionID = nil
 	sub.StripePriceID = nil
 
-	if err := s.db.Save(&sub).Error; err != nil {
+	if err := s.subRepo.Save(s.exec, sub); err != nil {
 		return fmt.Errorf("update subscription: %w", err)
 	}
 
@@ -317,11 +328,11 @@ func (s *StripeService) handleInvoicePaid(data json.RawMessage) error {
 	}
 	subID := invoice.Parent.SubscriptionDetails.Subscription.ID
 
-	var sub models.Subscription
-	if err := s.db.Where("stripe_subscription_id = ?", subID).First(&sub).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
+	sub, err := s.subRepo.FindByStripeSubscriptionID(s.exec, subID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("find subscription: %w", err)
 	}
 
@@ -340,7 +351,5 @@ func (s *StripeService) handleInvoicePaymentFailed(data json.RawMessage) error {
 	}
 	subID := invoice.Parent.SubscriptionDetails.Subscription.ID
 
-	return s.db.Model(&models.Subscription{}).
-		Where("stripe_subscription_id = ?", subID).
-		Update("status", "past_due").Error
+	return s.subRepo.UpdateStatus(s.exec, subID, "past_due")
 }

@@ -1,4 +1,4 @@
-package services
+package client
 
 import (
 	"bytes"
@@ -10,38 +10,15 @@ import (
 	"time"
 )
 
-type WhisperClient struct {
+// whisperClient implements WhisperClient using HTTP calls to the ML service.
+type whisperClient struct {
 	mlServiceURL string
 	httpClient   *http.Client
 }
 
-type TranscriptionResult struct {
-	Text     string
-	Language string
-	Duration float64
-}
-
-// transcribeRequest is the request body for the ML service /api/v1/transcribe endpoint
-type transcribeRequest struct {
-	AudioURL string  `json:"audio_url"`
-	Language *string `json:"language,omitempty"`
-}
-
-// transcribeResponse is the response from the ML service
-type transcribeResponse struct {
-	Status   string  `json:"status"`
-	Text     *string `json:"text,omitempty"`
-	Language *string `json:"language,omitempty"`
-	Duration *float64 `json:"duration,omitempty"`
-	Error    *struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-	} `json:"error,omitempty"`
-}
-
-// NewWhisperClient creates a new Whisper client that uses the ML service
-func NewWhisperClient(mlServiceURL string) *WhisperClient {
-	return &WhisperClient{
+// NewWhisperClient creates a new Whisper client that uses the ML service.
+func NewWhisperClient(mlServiceURL string) WhisperClient {
+	return &whisperClient{
 		mlServiceURL: mlServiceURL,
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second, // 2 minute timeout for transcription
@@ -49,8 +26,26 @@ func NewWhisperClient(mlServiceURL string) *WhisperClient {
 	}
 }
 
-// TranscribeFromURL transcribes audio from a presigned URL using the ML service
-func (w *WhisperClient) TranscribeFromURL(ctx context.Context, audioURL string) (*TranscriptionResult, error) {
+// transcribeRequest is the request body for the ML service /api/v1/transcribe endpoint.
+type transcribeRequest struct {
+	AudioURL string  `json:"audio_url"`
+	Language *string `json:"language,omitempty"`
+}
+
+// transcribeResponse is the response from the ML service.
+type transcribeResponse struct {
+	Status   string   `json:"status"`
+	Text     *string  `json:"text,omitempty"`
+	Language *string  `json:"language,omitempty"`
+	Duration *float64 `json:"duration,omitempty"`
+	Error    *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+}
+
+// TranscribeFromURL transcribes audio from a presigned URL using the ML service.
+func (w *whisperClient) TranscribeFromURL(ctx context.Context, audioURL string) (*TranscriptionResult, error) {
 	reqBody := transcribeRequest{
 		AudioURL: audioURL,
 	}

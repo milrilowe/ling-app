@@ -3,14 +3,16 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 
-	"ling-app/api/internal/db"
+	"ling-app/api/internal/client"
 	"ling-app/api/internal/middleware"
 	"ling-app/api/internal/models"
+	"ling-app/api/internal/repository"
 	"ling-app/api/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -18,19 +20,34 @@ import (
 )
 
 type ThreadHandler struct {
-	DB                  *db.DB
-	OpenAIClient        *services.OpenAIClient
-	Storage             *services.StorageService
-	WhisperClient       *services.WhisperClient
-	TTSClient           *services.TTSClient
+	exec                repository.Executor
+	threadRepo          repository.ThreadRepository
+	messageRepo         repository.MessageRepository
+	OpenAIClient        client.OpenAIClient
+	Storage             client.StorageClient
+	WhisperClient       client.WhisperClient
+	TTSClient           client.TTSClient
 	PronunciationWorker *services.PronunciationWorker
 	CreditsService      *services.CreditsService
 	MaxAudioFileSize    int64
 }
 
-func NewThreadHandler(database *db.DB, openAIClient *services.OpenAIClient, storage *services.StorageService, whisper *services.WhisperClient, ttsClient *services.TTSClient, pronunciationWorker *services.PronunciationWorker, creditsService *services.CreditsService, maxAudioFileSize int64) *ThreadHandler {
+func NewThreadHandler(
+	exec repository.Executor,
+	threadRepo repository.ThreadRepository,
+	messageRepo repository.MessageRepository,
+	openAIClient client.OpenAIClient,
+	storage client.StorageClient,
+	whisper client.WhisperClient,
+	ttsClient client.TTSClient,
+	pronunciationWorker *services.PronunciationWorker,
+	creditsService *services.CreditsService,
+	maxAudioFileSize int64,
+) *ThreadHandler {
 	return &ThreadHandler{
-		DB:                  database,
+		exec:                exec,
+		threadRepo:          threadRepo,
+		messageRepo:         messageRepo,
 		OpenAIClient:        openAIClient,
 		Storage:             storage,
 		WhisperClient:       whisper,
@@ -46,13 +63,12 @@ type CreateThreadRequest struct {
 	FirstUserMessage string `json:"firstUserMessage"`
 }
 
-
 // GetThreads retrieves all non-archived threads for the current user, ordered by most recent
 func (h *ThreadHandler) GetThreads(c *gin.Context) {
 	user := middleware.MustGetUser(c)
 
-	var threads []models.Thread
-	if err := h.DB.Where("user_id = ? AND archived_at IS NULL", user.ID).Order("created_at DESC").Find(&threads).Error; err != nil {
+	threads, err := h.threadRepo.FindByUserID(h.exec, user.ID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch threads"})
 		return
 	}
@@ -63,8 +79,8 @@ func (h *ThreadHandler) GetThreads(c *gin.Context) {
 func (h *ThreadHandler) GetArchivedThreads(c *gin.Context) {
 	user := middleware.MustGetUser(c)
 
-	var threads []models.Thread
-	if err := h.DB.Where("user_id = ? AND archived_at IS NOT NULL", user.ID).Order("archived_at DESC").Find(&threads).Error; err != nil {
+	threads, err := h.threadRepo.FindArchivedByUserID(h.exec, user.ID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch archived threads"})
 		return
 	}
@@ -89,7 +105,7 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 	}
 
 	// Create thread
-	if err := h.DB.Create(&thread).Error; err != nil {
+	if err := h.threadRepo.Create(h.exec, &thread); err != nil {
 		log.Printf("Error creating thread: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create thread"})
 		return
@@ -105,7 +121,7 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 			Timestamp: time.Now(),
 		}
 
-		if err := h.DB.Create(&aiMessage).Error; err != nil {
+		if err := h.messageRepo.Create(h.exec, &aiMessage); err != nil {
 			log.Printf("Error creating AI message: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
 			return
@@ -122,21 +138,21 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 			Timestamp: time.Now(),
 		}
 
-		if err := h.DB.Create(&userMessage).Error; err != nil {
+		if err := h.messageRepo.Create(h.exec, &userMessage); err != nil {
 			log.Printf("Error creating user message: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
 			return
 		}
 
 		// Generate AI response
-		conversationHistory := []services.ConversationMessage{}
+		conversationHistory := []client.ConversationMessage{}
 		if req.InitialPrompt != "" {
-			conversationHistory = append(conversationHistory, services.ConversationMessage{
+			conversationHistory = append(conversationHistory, client.ConversationMessage{
 				Role:    "assistant",
 				Content: req.InitialPrompt,
 			})
 		}
-		conversationHistory = append(conversationHistory, services.ConversationMessage{
+		conversationHistory = append(conversationHistory, client.ConversationMessage{
 			Role:    "user",
 			Content: req.FirstUserMessage,
 		})
@@ -156,7 +172,7 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 			Timestamp: time.Now(),
 		}
 
-		if err := h.DB.Create(&responseMessage).Error; err != nil {
+		if err := h.messageRepo.Create(h.exec, &responseMessage); err != nil {
 			log.Printf("Error creating AI response message: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
 			return
@@ -167,13 +183,14 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 	}
 
 	// Load thread with messages
-	if err := h.DB.Preload("Messages").First(&thread, thread.ID).Error; err != nil {
+	threadWithMessages, err := h.threadRepo.FindByIDWithMessages(h.exec, thread.ID)
+	if err != nil {
 		log.Printf("Error loading thread: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load thread"})
 		return
 	}
 
-	c.JSON(http.StatusOK, thread)
+	c.JSON(http.StatusOK, threadWithMessages)
 }
 
 // GetThread retrieves a thread with all messages (only if owned by current user)
@@ -187,10 +204,13 @@ func (h *ThreadHandler) GetThread(c *gin.Context) {
 		return
 	}
 
-	var thread models.Thread
-	// Only fetch if thread belongs to current user
-	if err := h.DB.Preload("Messages").Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+	thread, err := h.threadRepo.FindByIDAndUserIDWithMessages(h.exec, parsedID, user.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch thread"})
 		return
 	}
 
@@ -209,9 +229,13 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 	}
 
 	// Check if thread exists and belongs to current user
-	var thread models.Thread
-	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+	thread, err := h.threadRepo.FindByIDAndUserID(h.exec, parsedID, user.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch thread"})
 		return
 	}
 
@@ -263,18 +287,18 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 
 	// Save user message with audio (pronunciation analysis pending)
 	userMessage := models.Message{
-		ID:                    userMessageID,
-		ThreadID:              parsedID,
-		Role:                  "user",
-		Content:               transcription.Text,
-		AudioURL:              &userAudioKey,
-		AudioDurationSeconds:  &transcription.Duration,
-		HasAudio:              true,
-		Timestamp:             time.Now(),
-		PronunciationStatus:   "pending",
+		ID:                   userMessageID,
+		ThreadID:             parsedID,
+		Role:                 "user",
+		Content:              transcription.Text,
+		AudioURL:             &userAudioKey,
+		AudioDurationSeconds: &transcription.Duration,
+		HasAudio:             true,
+		Timestamp:            time.Now(),
+		PronunciationStatus:  "pending",
 	}
 
-	if err := h.DB.Create(&userMessage).Error; err != nil {
+	if err := h.messageRepo.Create(h.exec, &userMessage); err != nil {
 		log.Printf("Error creating user message: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
 		return
@@ -286,17 +310,17 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 	}
 
 	// Get conversation history
-	var messages []models.Message
-	if err := h.DB.Where("thread_id = ?", parsedID).Order("timestamp ASC").Find(&messages).Error; err != nil {
+	messages, err := h.messageRepo.FindByThreadID(h.exec, parsedID)
+	if err != nil {
 		log.Printf("Error fetching messages: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
 		return
 	}
 
 	// Convert to OpenAI format
-	conversationHistory := make([]services.ConversationMessage, len(messages))
+	conversationHistory := make([]client.ConversationMessage, len(messages))
 	for i, msg := range messages {
-		conversationHistory[i] = services.ConversationMessage{
+		conversationHistory[i] = client.ConversationMessage{
 			Role:    msg.Role,
 			Content: msg.Content,
 		}
@@ -325,7 +349,7 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 			Timestamp: time.Now(),
 		}
 
-		if err := h.DB.Create(&responseMessage).Error; err != nil {
+		if err := h.messageRepo.Create(h.exec, &responseMessage); err != nil {
 			log.Printf("Error creating AI response: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create response"})
 			return
@@ -354,7 +378,7 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 			Timestamp: time.Now(),
 		}
 
-		if err := h.DB.Create(&responseMessage).Error; err != nil {
+		if err := h.messageRepo.Create(h.exec, &responseMessage); err != nil {
 			log.Printf("Error creating AI response: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create response"})
 			return
@@ -380,7 +404,7 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 		Timestamp:            time.Now(),
 	}
 
-	if err := h.DB.Create(&responseMessage).Error; err != nil {
+	if err := h.messageRepo.Create(h.exec, &responseMessage); err != nil {
 		log.Printf("Error creating AI response: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create response"})
 		return
@@ -411,8 +435,8 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 // generateThreadName generates a thread name from AI response content (runs async)
 func (h *ThreadHandler) generateThreadName(threadID uuid.UUID, aiResponse string) {
 	// Check if thread already has a name
-	var thread models.Thread
-	if err := h.DB.First(&thread, threadID).Error; err != nil {
+	thread, err := h.threadRepo.FindByID(h.exec, threadID)
+	if err != nil {
 		log.Printf("Error fetching thread for naming: %v", err)
 		return
 	}
@@ -429,7 +453,7 @@ func (h *ThreadHandler) generateThreadName(threadID uuid.UUID, aiResponse string
 	}
 
 	// Update thread name
-	if err := h.DB.Model(&thread).Update("name", title).Error; err != nil {
+	if err := h.threadRepo.UpdateName(h.exec, threadID, title); err != nil {
 		log.Printf("Error updating thread name: %v", err)
 	}
 }
@@ -450,9 +474,13 @@ func (h *ThreadHandler) UpdateThread(c *gin.Context) {
 		return
 	}
 
-	var thread models.Thread
-	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+	thread, err := h.threadRepo.FindByIDAndUserID(h.exec, parsedID, user.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch thread"})
 		return
 	}
 
@@ -466,7 +494,7 @@ func (h *ThreadHandler) UpdateThread(c *gin.Context) {
 		thread.Name = req.Name
 	}
 
-	if err := h.DB.Save(&thread).Error; err != nil {
+	if err := h.threadRepo.Save(h.exec, thread); err != nil {
 		log.Printf("Error updating thread: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thread"})
 		return
@@ -486,14 +514,18 @@ func (h *ThreadHandler) DeleteThread(c *gin.Context) {
 		return
 	}
 
-	var thread models.Thread
-	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+	thread, err := h.threadRepo.FindByIDAndUserID(h.exec, parsedID, user.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch thread"})
 		return
 	}
 
 	// Delete thread (messages cascade delete via GORM constraint)
-	if err := h.DB.Delete(&thread).Error; err != nil {
+	if err := h.threadRepo.Delete(h.exec, thread); err != nil {
 		log.Printf("Error deleting thread: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete thread"})
 		return
@@ -513,16 +545,20 @@ func (h *ThreadHandler) ArchiveThread(c *gin.Context) {
 		return
 	}
 
-	var thread models.Thread
-	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+	thread, err := h.threadRepo.FindByIDAndUserID(h.exec, parsedID, user.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch thread"})
 		return
 	}
 
 	now := time.Now()
 	thread.ArchivedAt = &now
 
-	if err := h.DB.Save(&thread).Error; err != nil {
+	if err := h.threadRepo.Save(h.exec, thread); err != nil {
 		log.Printf("Error archiving thread: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive thread"})
 		return
@@ -542,15 +578,19 @@ func (h *ThreadHandler) UnarchiveThread(c *gin.Context) {
 		return
 	}
 
-	var thread models.Thread
-	if err := h.DB.Where("id = ? AND user_id = ?", parsedID, user.ID).First(&thread).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+	thread, err := h.threadRepo.FindByIDAndUserID(h.exec, parsedID, user.ID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Thread not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch thread"})
 		return
 	}
 
 	thread.ArchivedAt = nil
 
-	if err := h.DB.Save(&thread).Error; err != nil {
+	if err := h.threadRepo.Save(h.exec, thread); err != nil {
 		log.Printf("Error unarchiving thread: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unarchive thread"})
 		return

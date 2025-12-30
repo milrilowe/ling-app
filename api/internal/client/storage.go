@@ -1,4 +1,4 @@
-package services
+package client
 
 import (
 	"context"
@@ -12,13 +12,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-type StorageService struct {
+// storageClient implements StorageClient using S3/MinIO.
+type storageClient struct {
 	client *s3.Client
 	bucket string
 }
 
-// NewStorageService creates a new storage service for S3/MinIO
-func NewStorageService(endpoint, accessKey, secretKey, bucket, region string) (*StorageService, error) {
+// NewStorageClient creates a new storage client for S3/MinIO.
+func NewStorageClient(endpoint, accessKey, secretKey, bucket, region string) (StorageClient, error) {
 	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, regionID string, options ...interface{}) (aws.Endpoint, error) {
 		if endpoint != "" {
 			return aws.Endpoint{
@@ -43,14 +44,14 @@ func NewStorageService(endpoint, accessKey, secretKey, bucket, region string) (*
 		o.UsePathStyle = true // Required for MinIO
 	})
 
-	return &StorageService{
+	return &storageClient{
 		client: client,
 		bucket: bucket,
 	}, nil
 }
 
-// UploadAudio uploads an audio file to S3/MinIO
-func (s *StorageService) UploadAudio(ctx context.Context, file io.Reader, key string, contentType string) (string, error) {
+// UploadAudio uploads an audio file to S3/MinIO.
+func (s *storageClient) UploadAudio(ctx context.Context, file io.Reader, key string, contentType string) (string, error) {
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(key),
@@ -64,8 +65,8 @@ func (s *StorageService) UploadAudio(ctx context.Context, file io.Reader, key st
 	return key, nil
 }
 
-// GetPresignedURL generates a presigned URL for audio access
-func (s *StorageService) GetPresignedURL(ctx context.Context, key string, expiration time.Duration) (string, error) {
+// GetPresignedURL generates a presigned URL for audio access.
+func (s *storageClient) GetPresignedURL(ctx context.Context, key string, expiration time.Duration) (string, error) {
 	presignClient := s3.NewPresignClient(s.client)
 
 	request, err := presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
@@ -80,8 +81,8 @@ func (s *StorageService) GetPresignedURL(ctx context.Context, key string, expira
 	return request.URL, nil
 }
 
-// DeleteAudio deletes an audio file from S3/MinIO
-func (s *StorageService) DeleteAudio(ctx context.Context, key string) error {
+// DeleteAudio deletes an audio file from S3/MinIO.
+func (s *storageClient) DeleteAudio(ctx context.Context, key string) error {
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -92,8 +93,8 @@ func (s *StorageService) DeleteAudio(ctx context.Context, key string) error {
 	return nil
 }
 
-// EnsureBucketExists creates the bucket if it doesn't exist
-func (s *StorageService) EnsureBucketExists(ctx context.Context) error {
+// EnsureBucketExists creates the bucket if it doesn't exist.
+func (s *storageClient) EnsureBucketExists(ctx context.Context) error {
 	_, err := s.client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(s.bucket),
 	})

@@ -1,4 +1,4 @@
-package services
+package client
 
 import (
 	"context"
@@ -7,19 +7,21 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 )
 
-type OpenAIClient struct {
+// openaiClient implements OpenAIClient using the OpenAI API.
+type openaiClient struct {
 	client *openai.Client
 }
 
-func NewOpenAIClient(apiKey string) *OpenAIClient {
+// NewOpenAIClient creates a new OpenAI client.
+func NewOpenAIClient(apiKey string) OpenAIClient {
 	client := openai.NewClient(apiKey)
-	return &OpenAIClient{
+	return &openaiClient{
 		client: client,
 	}
 }
 
-// Generate calls OpenAI to generate an AI response
-func (c *OpenAIClient) Generate(messages []ConversationMessage) (string, error) {
+// Generate calls OpenAI to generate an AI response.
+func (c *openaiClient) Generate(messages []ConversationMessage) (string, error) {
 	// Convert our message format to OpenAI format
 	openaiMessages := make([]openai.ChatCompletionMessage, len(messages))
 	for i, msg := range messages {
@@ -48,8 +50,8 @@ func (c *OpenAIClient) Generate(messages []ConversationMessage) (string, error) 
 	return resp.Choices[0].Message.Content, nil
 }
 
-// GenerateTitle generates a short title (3-5 words) from conversation content
-func (c *OpenAIClient) GenerateTitle(content string) (string, error) {
+// GenerateTitle generates a short title (3-5 words) from conversation content.
+func (c *openaiClient) GenerateTitle(content string) (string, error) {
 	resp, err := c.client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{

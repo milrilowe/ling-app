@@ -6,8 +6,10 @@ import (
 	"log"
 	"time"
 
+	"ling-app/api/internal/client"
 	"ling-app/api/internal/db"
 	"ling-app/api/internal/models"
+	"ling-app/api/internal/repository"
 
 	"github.com/google/uuid"
 )
@@ -15,15 +17,46 @@ import (
 // PronunciationWorker handles async pronunciation analysis
 type PronunciationWorker struct {
 	DB                  *db.DB
-	MLClient            *MLClient
-	Storage             *StorageService
+	exec                repository.Executor
+	messageRepo         repository.MessageRepository
+	threadRepo          repository.ThreadRepository
+	MLClient            client.MLClient
+	Storage             client.StorageClient
 	PhonemeStatsService *PhonemeStatsService
 }
 
 // NewPronunciationWorker creates a new pronunciation worker
-func NewPronunciationWorker(database *db.DB, mlClient *MLClient, storage *StorageService, phonemeStatsService *PhonemeStatsService) *PronunciationWorker {
+func NewPronunciationWorker(
+	database *db.DB,
+	mlClient client.MLClient,
+	storage client.StorageClient,
+	phonemeStatsService *PhonemeStatsService,
+) *PronunciationWorker {
 	return &PronunciationWorker{
 		DB:                  database,
+		exec:                database.DB,
+		messageRepo:         repository.NewMessageRepository(),
+		threadRepo:          repository.NewThreadRepository(),
+		MLClient:            mlClient,
+		Storage:             storage,
+		PhonemeStatsService: phonemeStatsService,
+	}
+}
+
+// NewPronunciationWorkerForTest creates a PronunciationWorker with injected dependencies for testing.
+func NewPronunciationWorkerForTest(
+	exec repository.Executor,
+	messageRepo repository.MessageRepository,
+	threadRepo repository.ThreadRepository,
+	mlClient client.MLClient,
+	storage client.StorageClient,
+	phonemeStatsService *PhonemeStatsService,
+) *PronunciationWorker {
+	return &PronunciationWorker{
+		DB:                  nil,
+		exec:                exec,
+		messageRepo:         messageRepo,
+		threadRepo:          threadRepo,
 		MLClient:            mlClient,
 		Storage:             storage,
 		PhonemeStatsService: phonemeStatsService,
@@ -91,16 +124,7 @@ func (w *PronunciationWorker) AnalyzeAsync(messageID uuid.UUID, audioKey, expect
 
 	// Update message with results
 	now := time.Now()
-	err = w.DB.Model(&models.Message{}).
-		Where("id = ?", messageID).
-		Updates(map[string]interface{}{
-			"pronunciation_status":     "complete",
-			"pronunciation_analysis":   analysisMap,
-			"pronunciation_error":      nil,
-			"pronunciation_updated_at": now,
-		}).Error
-
-	if err != nil {
+	if err := w.messageRepo.UpdatePronunciationAnalysis(w.exec, messageID, "complete", analysisMap, now); err != nil {
 		log.Printf("[PronunciationWorker] Failed to update message: %v", err)
 		return
 	}
@@ -111,14 +135,14 @@ func (w *PronunciationWorker) AnalyzeAsync(messageID uuid.UUID, audioKey, expect
 	// Record phoneme stats for the user
 	if w.PhonemeStatsService != nil && len(result.Analysis.PhonemeDetails) > 0 {
 		// Get user ID from message -> thread -> user
-		var message models.Message
-		if err := w.DB.First(&message, messageID).Error; err != nil {
+		message, err := w.messageRepo.FindByID(w.exec, messageID)
+		if err != nil {
 			log.Printf("[PronunciationWorker] Failed to fetch message for phoneme stats: %v", err)
 			return
 		}
 
-		var thread models.Thread
-		if err := w.DB.First(&thread, message.ThreadID).Error; err != nil {
+		thread, err := w.threadRepo.FindByID(w.exec, message.ThreadID)
+		if err != nil {
 			log.Printf("[PronunciationWorker] Failed to fetch thread for phoneme stats: %v", err)
 			return
 		}
@@ -135,22 +159,12 @@ func (w *PronunciationWorker) AnalyzeAsync(messageID uuid.UUID, audioKey, expect
 func (w *PronunciationWorker) markFailed(messageID uuid.UUID, code, message string) {
 	now := time.Now()
 	errMsg := code + ": " + message
-	err := w.DB.Model(&models.Message{}).
-		Where("id = ?", messageID).
-		Updates(map[string]interface{}{
-			"pronunciation_status":     "failed",
-			"pronunciation_error":      errMsg,
-			"pronunciation_updated_at": now,
-		}).Error
-
-	if err != nil {
+	if err := w.messageRepo.UpdatePronunciationError(w.exec, messageID, "failed", errMsg, now); err != nil {
 		log.Printf("[PronunciationWorker] Failed to update message with error status: %v", err)
 	}
 }
 
 // MarkPending marks a message as pending for pronunciation analysis
 func (w *PronunciationWorker) MarkPending(messageID uuid.UUID) error {
-	return w.DB.Model(&models.Message{}).
-		Where("id = ?", messageID).
-		Update("pronunciation_status", "pending").Error
+	return w.messageRepo.UpdatePronunciationStatus(w.exec, messageID, "pending")
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"ling-app/api/internal/models"
-	"ling-app/api/internal/services"
+	"ling-app/api/internal/services/auth"
 )
 
 // Context keys for storing user data
@@ -17,7 +17,7 @@ const (
 // RequireAuth is middleware that requires a valid session.
 // If the session is invalid or missing, it returns 401 Unauthorized.
 // If valid, it sets the user in the Gin context for handlers to access.
-func RequireAuth(authService *services.AuthService) gin.HandlerFunc {
+func RequireAuth(authService *auth.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get session token from cookie
 		token, err := c.Cookie("session_token")
@@ -51,7 +51,7 @@ func RequireAuth(authService *services.AuthService) gin.HandlerFunc {
 // If a valid session exists, the user is set in context.
 // If not, the request continues without a user.
 // Useful for endpoints that work differently for authenticated vs anonymous users.
-func OptionalAuth(authService *services.AuthService) gin.HandlerFunc {
+func OptionalAuth(authService *auth.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := c.Cookie("session_token")
 		if err != nil {

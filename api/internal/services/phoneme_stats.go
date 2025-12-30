@@ -1,26 +1,39 @@
 package services
 
 import (
+	"ling-app/api/internal/client"
 	"ling-app/api/internal/db"
 	"ling-app/api/internal/models"
+	"ling-app/api/internal/repository"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm/clause"
 )
 
 // PhonemeStatsService handles phoneme statistics aggregation
 type PhonemeStatsService struct {
-	DB *db.DB
+	db       *db.DB
+	exec     repository.Executor
+	statsRepo repository.PhonemeStatsRepository
+	subsRepo  repository.PhonemeSubstitutionRepository
 }
 
 // NewPhonemeStatsService creates a new phoneme stats service
-func NewPhonemeStatsService(database *db.DB) *PhonemeStatsService {
-	return &PhonemeStatsService{DB: database}
+func NewPhonemeStatsService(
+	database *db.DB,
+	statsRepo repository.PhonemeStatsRepository,
+	subsRepo repository.PhonemeSubstitutionRepository,
+) *PhonemeStatsService {
+	return &PhonemeStatsService{
+		db:        database,
+		exec:      database.DB,
+		statsRepo: statsRepo,
+		subsRepo:  subsRepo,
+	}
 }
 
 // RecordPhonemeResults processes phoneme details from pronunciation analysis
 // and updates the user's aggregate statistics
-func (s *PhonemeStatsService) RecordPhonemeResults(userID uuid.UUID, phonemeDetails []PhonemeDetail) error {
+func (s *PhonemeStatsService) RecordPhonemeResults(userID uuid.UUID, phonemeDetails []client.PhonemeDetail) error {
 	if len(phonemeDetails) == 0 {
 		return nil
 	}
@@ -71,32 +84,16 @@ func (s *PhonemeStatsService) RecordPhonemeResults(userID uuid.UUID, phonemeDeta
 		}
 	}
 
-	// Upsert phoneme stats
+	// Upsert phoneme stats using repository
 	for _, stats := range statsMap {
-		err := s.DB.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "user_id"}, {Name: "phoneme"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				"total_attempts": clause.Expr{SQL: "phoneme_stats.total_attempts + ?", Vars: []interface{}{stats.TotalAttempts}},
-				"correct_count":  clause.Expr{SQL: "phoneme_stats.correct_count + ?", Vars: []interface{}{stats.CorrectCount}},
-				"deletion_count": clause.Expr{SQL: "phoneme_stats.deletion_count + ?", Vars: []interface{}{stats.DeletionCount}},
-				"updated_at":     clause.Expr{SQL: "NOW()"},
-			}),
-		}).Create(stats).Error
-		if err != nil {
+		if err := s.statsRepo.Upsert(s.exec, stats); err != nil {
 			return err
 		}
 	}
 
-	// Upsert substitution patterns
+	// Upsert substitution patterns using repository
 	for _, sub := range subsMap {
-		err := s.DB.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "user_id"}, {Name: "expected_phoneme"}, {Name: "actual_phoneme"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				"occurrence_count": clause.Expr{SQL: "phoneme_substitutions.occurrence_count + ?", Vars: []interface{}{sub.OccurrenceCount}},
-				"updated_at":       clause.Expr{SQL: "NOW()"},
-			}),
-		}).Create(sub).Error
-		if err != nil {
+		if err := s.subsRepo.Upsert(s.exec, sub); err != nil {
 			return err
 		}
 	}
@@ -112,7 +109,7 @@ type UserPhonemeStatsResponse struct {
 	CommonSubstitutions []SubstitutionPattern `json:"commonSubstitutions"`
 }
 
-// PhonemeAccuracy represents a single phoneme's accuracy
+// PhonemeAccuracy represents a single phoneme's accuracy (for API responses)
 type PhonemeAccuracy struct {
 	Phoneme       string  `json:"phoneme"`
 	TotalAttempts int     `json:"totalAttempts"`
@@ -130,8 +127,9 @@ type SubstitutionPattern struct {
 
 // GetUserStats retrieves aggregated phoneme statistics for a user
 func (s *PhonemeStatsService) GetUserStats(userID uuid.UUID) (*UserPhonemeStatsResponse, error) {
-	var stats []models.PhonemeStats
-	if err := s.DB.Where("user_id = ?", userID).Find(&stats).Error; err != nil {
+	// Get all stats for this user
+	stats, err := s.statsRepo.FindByUserID(s.exec, userID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -147,22 +145,27 @@ func (s *PhonemeStatsService) GetUserStats(userID uuid.UUID) (*UserPhonemeStatsR
 		overallAccuracy = float64(totalCorrect) / float64(totalAttempts) * 100
 	}
 
-	// Get all phoneme stats for this user
-	var phonemeStats []PhonemeAccuracy
-	if err := s.DB.Model(&models.PhonemeStats{}).
-		Select("phoneme, total_attempts, correct_count, deletion_count, (CAST(correct_count AS FLOAT) / CAST(total_attempts AS FLOAT) * 100) as accuracy").
-		Where("user_id = ?", userID).
-		Order("accuracy ASC").
-		Scan(&phonemeStats).Error; err != nil {
+	// Get accuracy ranking from repository
+	repoAccuracy, err := s.statsRepo.GetAccuracyRanking(s.exec, userID)
+	if err != nil {
 		return nil, err
 	}
 
+	// Convert repository PhonemeAccuracy to service PhonemeAccuracy
+	phonemeStats := make([]PhonemeAccuracy, len(repoAccuracy))
+	for i, pa := range repoAccuracy {
+		phonemeStats[i] = PhonemeAccuracy{
+			Phoneme:       pa.Phoneme,
+			TotalAttempts: pa.TotalAttempts,
+			CorrectCount:  pa.CorrectCount,
+			DeletionCount: pa.DeletionCount,
+			Accuracy:      pa.Accuracy,
+		}
+	}
+
 	// Get common substitutions
-	var substitutions []models.PhonemeSubstitution
-	if err := s.DB.Where("user_id = ?", userID).
-		Order("occurrence_count DESC").
-		Limit(10).
-		Find(&substitutions).Error; err != nil {
+	substitutions, err := s.subsRepo.FindTopByUserID(s.exec, userID, 10)
+	if err != nil {
 		return nil, err
 	}
 
