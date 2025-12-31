@@ -146,7 +146,7 @@ function RegisterPage() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/google`
+                  window.location.href = `${import.meta.env.VITE_API_URL || ''}/api/auth/google`
                 }}
               >
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -173,7 +173,7 @@ function RegisterPage() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/github`
+                  window.location.href = `${import.meta.env.VITE_API_URL || ''}/api/auth/github`
                 }}
               >
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">

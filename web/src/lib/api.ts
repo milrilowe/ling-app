@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// In production, nginx proxies /api/* to the internal API service (same origin)
+// In development, use VITE_API_URL to point to local API server
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
 class ApiError extends Error {
   constructor(
@@ -203,6 +205,7 @@ export async function sendAudioMessage(
   formData.append('audio', audioBlob, 'recording.webm')
 
   const url = `${API_BASE_URL}/api/threads/${threadId}/messages/audio`
+  // Note: API_BASE_URL is empty in production (same-origin proxy via nginx)
 
   try {
     const response = await fetch(url, {

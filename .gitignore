@@ -22,3 +22,11 @@ Thumbs.db
 tmp/
 temp/
 .cache/
+
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/*.tfvars
+!infra/terraform.tfvars.example
+infra/.terraform.lock.hcl

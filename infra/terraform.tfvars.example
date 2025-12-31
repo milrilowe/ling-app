@@ -1,0 +1,34 @@
+# Terraform Variables Example
+# Copy this to terraform.tfvars and fill in your values
+# NEVER commit terraform.tfvars to version control!
+
+aws_region  = "us-east-1"
+environment = "prod"
+
+# Database (defaults are fine for MVP)
+# db_instance_class    = "db.t3.micro"
+# db_allocated_storage = 20
+
+# ECS Resources (defaults are fine for MVP)
+# api_cpu    = 256
+# api_memory = 512
+# web_cpu    = 256
+# web_memory = 512
+# ml_cpu     = 1024
+# ml_memory  = 4096
+
+# Required Secrets - You must provide these
+session_secret = "" # Generate with: openssl rand -hex 32
+openai_api_key = "" # From OpenAI dashboard
+
+# OAuth (optional - leave empty to disable)
+google_client_id           = ""
+google_client_secret       = ""
+github_oauth_client_id     = ""
+github_oauth_client_secret = ""
+
+# Stripe (optional - leave empty to disable payments)
+stripe_secret_key     = ""
+stripe_webhook_secret = ""
+stripe_price_basic    = ""
+stripe_price_pro      = ""
