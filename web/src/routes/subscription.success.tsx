@@ -3,10 +3,9 @@ import { useEffect } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useSubscription, useCredits } from '@/hooks/use-subscription'
+import { useSubscription, useCredits, subscriptionKeys } from '@/hooks/use-subscription'
 import { TIER_INFO } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
-import { subscriptionKeys } from '@/hooks/use-subscription'
 
 export const Route = createFileRoute('/subscription/success')({
   component: SubscriptionSuccessPage,
