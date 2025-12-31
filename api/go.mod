@@ -1,6 +1,6 @@
 module ling-app/api
 
-go 1.25.4
+go 1.23
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.40.0
