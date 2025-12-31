@@ -27,7 +27,9 @@ jobs:
         working-directory: api
 
       - name: Unit tests with coverage
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: |
+          set -o pipefail
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | grep -v "no such tool"
         working-directory: api
 
       - name: Upload coverage
