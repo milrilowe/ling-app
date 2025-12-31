@@ -28,8 +28,8 @@ jobs:
 
       - name: Unit tests with coverage
         run: |
-          set -o pipefail
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | grep -v "no such tool"
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee test-output.txt
+          grep -q "^PASS$" test-output.txt
         working-directory: api
 
       - name: Upload coverage
