@@ -212,8 +212,8 @@ resource "aws_security_group" "ml" {
 
   ingress {
     description     = "HTTP from API service only"
-    from_port       = 8001
-    to_port         = 8001
+    from_port       = 8000
+    to_port         = 8000
     protocol        = "tcp"
     security_groups = [aws_security_group.api.id]
   }

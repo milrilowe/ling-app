@@ -65,16 +65,6 @@ export interface PronunciationAnalysis {
   processing_time_ms: number
 }
 
-export interface WordTiming {
-  word: string
-  start: number
-  end: number
-}
-
-export interface WordTimings {
-  words: WordTiming[]
-}
-
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -86,9 +76,6 @@ export interface Message {
   pronunciationStatus?: 'none' | 'pending' | 'complete' | 'failed'
   pronunciationAnalysis?: PronunciationAnalysis
   pronunciationError?: string
-  wordTimings?: WordTimings
-  wordTimingsStatus?: 'none' | 'pending' | 'complete' | 'failed'
-  wordTimingsError?: string
 }
 
 export interface Thread {

@@ -180,7 +180,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "HOST", value = "0.0.0.0" },
         { name = "GIN_MODE", value = "release" },
         { name = "ENVIRONMENT", value = var.environment },
-        { name = "ML_SERVICE_URL", value = "http://ml.ling.local:8001" },
+        { name = "ML_SERVICE_URL", value = "http://ml.ling.local:8000" },
         { name = "S3_BUCKET", value = aws_s3_bucket.audio.id },
         { name = "S3_REGION", value = var.aws_region },
         { name = "CORS_ALLOWED_ORIGINS", value = "https://${aws_lb.main.dns_name}" },
@@ -362,8 +362,8 @@ resource "aws_ecs_task_definition" "ml" {
 
       portMappings = [
         {
-          containerPort = 8001
-          hostPort      = 8001
+          containerPort = 8000
+          hostPort      = 8000
           protocol      = "tcp"
         }
       ]
@@ -378,7 +378,7 @@ resource "aws_ecs_task_definition" "ml" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+        command     = ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
         interval    = 30
         timeout     = 10
         retries     = 3

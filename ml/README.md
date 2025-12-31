@@ -520,22 +520,11 @@ This version includes **11 major accuracy improvements** over the baseline:
 
 **For maximum accuracy**: Use ensemble approach (warning: slow)
 
-## Context: Integration with Main API
-
-This service is part of a larger system:
-- **Main Web API**: Takes ChatGPT responses → converts to audio via ML service TTS
-- **Future feature**: MFA integration for karaoke-style playback (word highlighting with timing)
-- **This service**: Pronunciation comparison (audio IPA vs expected IPA) - NO timing needed
-
-MFA (Montreal Forced Aligner) will be used in the main API later for forced alignment with timing, not in this pronunciation comparison service.
-
 ## Known Limitations
 
 1. **gruut version mismatch**: Model was trained on gruut 0.6.2 (non-existent version), current is 2.4.0. The normalizer and post-processor mitigate format differences.
 
-2. **No timing information**: This service only compares pronunciation, not timing. Use MFA for forced alignment with timestamps.
-
-3. **Model accuracy**: Even with improvements, Whisper IPA model accuracy depends on:
+2. **Model accuracy**: Even with improvements, Whisper IPA model accuracy depends on:
    - Audio quality (use quality detection to identify issues)
    - Language/accent (provide language hints for better results)
    - Background noise (use noise reduction for noisy audio)
