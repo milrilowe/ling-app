@@ -68,7 +68,16 @@ func main() {
 	// Initialize AI clients
 	openAIClient := client.NewOpenAIClient(cfg.OpenAIAPIKey)
 	whisperClient := client.NewWhisperClient(cfg.MLServiceURL) // Uses local faster-whisper via ML service
-	ttsClient := client.NewTTSClient(cfg.MLServiceURL)         // Uses local Chatterbox TTS via ML service
+
+	// TTS: use ML service if configured, otherwise OpenAI
+	var ttsClient client.TTSClient
+	if cfg.TTSServiceURL != "" {
+		log.Printf("Using ML service for TTS: %s", cfg.TTSServiceURL)
+		ttsClient = client.NewMLTTSClient(cfg.TTSServiceURL)
+	} else {
+		log.Println("Using OpenAI TTS API")
+		ttsClient = client.NewOpenAITTSClient(cfg.OpenAIAPIKey)
+	}
 
 	// Initialize ML client for pronunciation analysis
 	mlClient := client.NewMLClient(cfg.MLServiceURL, time.Duration(cfg.MLServiceTimeout)*time.Second)

@@ -71,7 +71,7 @@ variable "ml_cpu" {
 variable "ml_memory" {
   description = "ML task memory in MB (higher for models)"
   type        = number
-  default     = 4096 # 4GB for ML models
+  default     = 4096 # 4GB for ML models (Whisper IPA + faster-whisper, TTS via OpenAI)
 }
 
 # Application secrets (passed via environment or tfvars)

@@ -65,8 +65,9 @@ def load_models(device: Optional[str] = None, language: str = "en-us"):
     print("Loading STT transcriber (faster-whisper)...")
     stt_transcriber = FasterWhisperTranscriber(model_size="medium", device=device)
 
-    print("Loading TTS synthesizer (Chatterbox)...")
-    tts_synthesizer = ChatterboxSynthesizer(device=device)
+    # TTS disabled - using OpenAI TTS API instead (Chatterbox needs ~10GB RAM)
+    # print("Loading TTS synthesizer (Chatterbox)...")
+    # tts_synthesizer = ChatterboxSynthesizer(device=device)
 
     print("All models loaded successfully!")
 
