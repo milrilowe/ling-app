@@ -183,7 +183,10 @@ resource "aws_ecs_task_definition" "api" {
         { name = "ML_SERVICE_URL", value = "http://ml.ling.local:8000" },
         { name = "S3_BUCKET", value = aws_s3_bucket.audio.id },
         { name = "S3_REGION", value = var.aws_region },
-        { name = "CORS_ALLOWED_ORIGINS", value = "https://${aws_lb.main.dns_name}" },
+        { name = "CORS_ALLOWED_ORIGINS", value = "https://${var.domain_name}" },
+        { name = "FRONTEND_URL", value = "https://${var.domain_name}" },
+        { name = "GOOGLE_REDIRECT_URL", value = "https://${var.domain_name}/api/auth/google/callback" },
+        { name = "GITHUB_REDIRECT_URL", value = "https://${var.domain_name}/api/auth/github/callback" },
       ]
 
       secrets = [
@@ -232,9 +235,9 @@ resource "aws_ecs_service" "api" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = aws_subnet.private[*].id
+    subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.api.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   service_registries {
@@ -402,9 +405,9 @@ resource "aws_ecs_service" "ml" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = aws_subnet.private[*].id
+    subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.ml.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   service_registries {
@@ -429,7 +432,7 @@ resource "aws_ecs_service" "ml" {
 resource "aws_ssm_parameter" "database_url" {
   name  = "/${local.name_prefix}/DATABASE_URL"
   type  = "SecureString"
-  value = "postgresql://${var.db_username}:${random_password.db_password.result}@${aws_db_instance.main.endpoint}/${var.db_name}"
+  value = "postgresql://${var.db_username}:${urlencode(random_password.db_password.result)}@${aws_db_instance.main.endpoint}/${var.db_name}"
 
   tags = {
     Name = "${local.name_prefix}-database-url"

@@ -138,3 +138,9 @@ variable "stripe_price_pro" {
   type        = string
   default     = ""
 }
+
+# Domain
+variable "domain_name" {
+  description = "Custom domain name (e.g., example.com)"
+  type        = string
+}

@@ -2,8 +2,13 @@
 # These values are needed for GitHub secrets and DNS configuration
 
 output "alb_dns_name" {
-  description = "ALB DNS name - access your app here"
+  description = "ALB DNS name (use app_url instead)"
   value       = aws_lb.main.dns_name
+}
+
+output "app_url" {
+  description = "Application URL - access your app here"
+  value       = "https://${var.domain_name}"
 }
 
 output "ecr_registry" {
