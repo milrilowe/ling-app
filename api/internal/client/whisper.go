@@ -6,19 +6,117 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"time"
 )
 
-// whisperClient implements WhisperClient using HTTP calls to the ML service.
-type whisperClient struct {
+// openAIWhisperClient uses OpenAI Whisper API.
+type openAIWhisperClient struct {
+	apiKey     string
+	httpClient *http.Client
+}
+
+// NewOpenAIWhisperClient creates a Whisper client using OpenAI API.
+func NewOpenAIWhisperClient(apiKey string) WhisperClient {
+	return &openAIWhisperClient{
+		apiKey: apiKey,
+		httpClient: &http.Client{
+			Timeout: 60 * time.Second,
+		},
+	}
+}
+
+func (w *openAIWhisperClient) TranscribeFromURL(ctx context.Context, audioURL string) (*TranscriptionResult, error) {
+	// Download audio from URL first
+	audioResp, err := http.Get(audioURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download audio: %w", err)
+	}
+	defer audioResp.Body.Close()
+
+	if audioResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to download audio: status %d", audioResp.StatusCode)
+	}
+
+	audioBytes, err := io.ReadAll(audioResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read audio: %w", err)
+	}
+
+	// Create multipart form
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	// Add audio file
+	part, err := writer.CreateFormFile("file", "audio.webm")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create form file: %w", err)
+	}
+	if _, err := part.Write(audioBytes); err != nil {
+		return nil, fmt.Errorf("failed to write audio: %w", err)
+	}
+
+	// Add model field
+	if err := writer.WriteField("model", "whisper-1"); err != nil {
+		return nil, fmt.Errorf("failed to write model field: %w", err)
+	}
+
+	// Add response format for duration
+	if err := writer.WriteField("response_format", "verbose_json"); err != nil {
+		return nil, fmt.Errorf("failed to write response_format field: %w", err)
+	}
+
+	writer.Close()
+
+	// Create request
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/audio/transcriptions", &buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+w.apiKey)
+
+	resp, err := w.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call OpenAI Whisper API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("OpenAI Whisper API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Text     string  `json:"text"`
+		Language string  `json:"language"`
+		Duration float64 `json:"duration"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &TranscriptionResult{
+		Text:     result.Text,
+		Language: result.Language,
+		Duration: result.Duration,
+	}, nil
+}
+
+// mlWhisperClient uses the ML service (faster-whisper).
+type mlWhisperClient struct {
 	mlServiceURL string
 	httpClient   *http.Client
 }
 
-// NewWhisperClient creates a new Whisper client that uses the ML service.
-func NewWhisperClient(mlServiceURL string) WhisperClient {
-	return &whisperClient{
+// NewMLWhisperClient creates a Whisper client using the ML service.
+func NewMLWhisperClient(mlServiceURL string) WhisperClient {
+	return &mlWhisperClient{
 		mlServiceURL: mlServiceURL,
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second, // 2 minute timeout for transcription
@@ -45,7 +143,7 @@ type transcribeResponse struct {
 }
 
 // TranscribeFromURL transcribes audio from a presigned URL using the ML service.
-func (w *whisperClient) TranscribeFromURL(ctx context.Context, audioURL string) (*TranscriptionResult, error) {
+func (w *mlWhisperClient) TranscribeFromURL(ctx context.Context, audioURL string) (*TranscriptionResult, error) {
 	reqBody := transcribeRequest{
 		AudioURL: audioURL,
 	}

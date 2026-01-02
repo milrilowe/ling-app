@@ -38,6 +38,9 @@ type Config struct {
 	// TTS Service (empty = use OpenAI TTS, set to ML service URL for Chatterbox)
 	TTSServiceURL string
 
+	// STT Service (empty = use OpenAI Whisper, set to ML service URL for faster-whisper)
+	STTServiceURL string
+
 	// OpenAI
 	OpenAIAPIKey string
 
@@ -89,6 +92,8 @@ func Load() *Config {
 		MLServiceTimeout: 120, // 2 minutes for pronunciation analysis
 
 		TTSServiceURL: getEnv("TTS_SERVICE_URL", ""), // Empty = OpenAI TTS, or set to ML service URL
+
+		STTServiceURL: getEnv("STT_SERVICE_URL", ""), // Empty = OpenAI Whisper, or set to ML service URL
 
 		OpenAIAPIKey: getEnv("OPENAI_API_KEY", ""),
 
