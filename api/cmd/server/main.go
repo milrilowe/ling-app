@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 	"time"
@@ -59,26 +58,12 @@ func main() {
 	oauthService := services.NewOAuthService(cfg)
 
 	// Initialize storage client
-	storageClient, err := client.NewStorageClient(
-		cfg.S3Endpoint,
-		cfg.S3AccessKey,
-		cfg.S3SecretKey,
-		cfg.S3Bucket,
-		cfg.S3Region,
-	)
+	storageClient, err := client.NewStorageClient(cfg.S3Bucket, cfg.S3Region)
 	if err != nil {
 		log.Fatal("Failed to initialize storage client:", err)
 		os.Exit(1)
 	}
-
-	// Ensure MinIO bucket exists
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	if err := storageClient.EnsureBucketExists(ctx); err != nil {
-		log.Printf("Warning: Failed to ensure bucket exists: %v", err)
-	} else {
-		log.Printf("Storage bucket '%s' is ready", cfg.S3Bucket)
-	}
+	log.Printf("Storage bucket '%s' configured in region '%s'", cfg.S3Bucket, cfg.S3Region)
 
 	// Initialize AI clients
 	openAIClient := client.NewOpenAIClient(cfg.OpenAIAPIKey)
