@@ -34,6 +34,7 @@ Fill in your API keys (see each package's README for details).
 Run each service in a separate terminal:
 
 **Terminal 1 - Web** (http://localhost:3000)
+
 ```bash
 cd web
 pnpm install
@@ -41,12 +42,14 @@ pnpm dev
 ```
 
 **Terminal 2 - API** (http://localhost:8080)
+
 ```bash
 cd api
 go run cmd/server/main.go
 ```
 
 **Terminal 3 - ML** (http://localhost:8000)
+
 ```bash
 cd ml
 python -m venv .venv
@@ -63,6 +66,7 @@ Web (React + Vite) → API (Go) → ML (Python/FastAPI)
                          ↓
                     PostgreSQL
                       MinIO
+                  3rd-party APIs
 ```
 
 - **Web**: Frontend with push-to-talk audio recording and conversation UI
