@@ -35,7 +35,9 @@ func (r *threadRepository) FindByID(exec Executor, id uuid.UUID) (*models.Thread
 
 func (r *threadRepository) FindByIDWithMessages(exec Executor, id uuid.UUID) (*models.Thread, error) {
 	var thread models.Thread
-	err := exec.Preload("Messages").First(&thread, id).Error
+	err := exec.Preload("Messages", func(db *gorm.DB) *gorm.DB {
+		return db.Order("timestamp ASC")
+	}).First(&thread, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}
@@ -77,7 +79,9 @@ func (r *threadRepository) FindByIDAndUserID(exec Executor, id, userID uuid.UUID
 
 func (r *threadRepository) FindByIDAndUserIDWithMessages(exec Executor, id, userID uuid.UUID) (*models.Thread, error) {
 	var thread models.Thread
-	err := exec.Preload("Messages").Where("id = ? AND user_id = ?", id, userID).First(&thread).Error
+	err := exec.Preload("Messages", func(db *gorm.DB) *gorm.DB {
+		return db.Order("timestamp ASC")
+	}).Where("id = ? AND user_id = ?", id, userID).First(&thread).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}
