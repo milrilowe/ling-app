@@ -24,7 +24,7 @@ class IPANormalizer:
     TIE_BAR = '\u0361'  # ͡
 
     # Prosodic/boundary markers to remove
-    PROSODIC_MARKERS = {'‖', '|', '‿'}
+    PROSODIC_MARKERS = {'‖', '|', '‿', '-', '.', '̩'}
 
     # Unicode character normalization mappings
     # Maps variant forms to canonical forms
@@ -62,6 +62,7 @@ class IPANormalizer:
     # IPA modifier letters that modify the preceding sound
     MODIFIER_LETTERS = {
         'ː',   # Length mark
+        ':',   # Length mark (ASCII, after normalization)
         'ˑ',   # Half-length
         'ʰ',   # Aspiration
         'ʷ',   # Labialization
