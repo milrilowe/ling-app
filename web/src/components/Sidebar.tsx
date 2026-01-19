@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import {
   Sidebar,
   SidebarContent,
@@ -8,29 +11,26 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuItem,
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ThreadListItem } from '@/features/sidebar/components/ThreadListItem'
-import { useThreads, useArchivedThreads } from '@/hooks/use-thread'
-import { useNavigate, Link } from '@tanstack/react-router'
+import { useArchivedThreads, useThreads } from '@/hooks/use-thread'
+import { cn } from '@/lib/utils'
+import { Link, useNavigate } from '@tanstack/react-router'
 import {
-  Sparkles,
+  Archive,
+  BarChart3,
+  ChevronDown,
+  Milk,
   PenSquare,
   Search,
   Settings,
-  Archive,
-  ChevronDown,
-  BarChart3,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { useState } from 'react'
 
 export function AppSidebar() {
   const navigate = useNavigate()
@@ -47,9 +47,9 @@ export function AppSidebar() {
       <SidebarHeader>
         <div className="group/header flex items-center gap-2 p-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Sparkles className="h-5 w-5 shrink-0" />
+            <Milk className="h-5 w-5 shrink-0" />
             <span className="font-semibold text-sm truncate group-data-[collapsible=icon]:hidden">
-              Ling App
+              UtterLabs
             </span>
           </div>
           <div className="group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:right-2 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:group-hover/header:opacity-100 transition-opacity">
@@ -73,9 +73,7 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton
-                    tooltip="Search"
-                  >
+                  <SidebarMenuButton tooltip="Search">
                     <Search className="h-4 w-4" />
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -86,10 +84,7 @@ export function AppSidebar() {
             <div className="group-data-[collapsible=icon]:hidden">
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={handleNewChat}
-                    className="mb-2"
-                  >
+                  <SidebarMenuButton onClick={handleNewChat} className="mb-2">
                     <PenSquare className="h-4 w-4" />
                     <span>New Conversation</span>
                   </SidebarMenuButton>
@@ -127,7 +122,7 @@ export function AppSidebar() {
                     <ChevronDown
                       className={cn(
                         'ml-auto h-4 w-4 transition-transform',
-                        showArchived && 'rotate-180'
+                        showArchived && 'rotate-180',
                       )}
                     />
                   </CollapsibleTrigger>

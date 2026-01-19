@@ -19,6 +19,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { DeleteThreadDialog } from './DeleteThreadDialog'
 import {
   useDeleteThread,
@@ -145,9 +150,16 @@ export function ThreadListItem({ thread }: ThreadListItemProps) {
                 disabled={updateThread.isPending}
               />
             ) : (
-              <p className="truncate text-sm font-medium leading-tight">
-                {title}
-              </p>
+              <Tooltip delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <p className="truncate text-sm font-medium leading-tight">
+                    {title}
+                  </p>
+                </TooltipTrigger>
+                <TooltipContent side="right" align="center">
+                  <p className="max-w-xs">{title}</p>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
         </SidebarMenuButton>

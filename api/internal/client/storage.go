@@ -8,32 +8,49 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// storageClient implements StorageClient using S3.
+// storageClient implements StorageClient using S3/MinIO.
 type storageClient struct {
 	client *s3.Client
 	bucket string
 }
 
-// NewStorageClient creates a new S3 storage client.
-// Uses AWS default credential chain (IAM roles in ECS, env vars locally).
-func NewStorageClient(bucket, region string) (StorageClient, error) {
+// NewStorageClient creates a new storage client for S3/MinIO.
+func NewStorageClient(endpoint, accessKey, secretKey, bucket, region string) (StorageClient, error) {
+	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, regionID string, options ...interface{}) (aws.Endpoint, error) {
+		if endpoint != "" {
+			return aws.Endpoint{
+				URL:               endpoint,
+				SigningRegion:     region,
+				HostnameImmutable: true,
+			}, nil
+		}
+		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+	})
+
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion(region),
+		config.WithEndpointResolverWithOptions(customResolver),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.UsePathStyle = true // Required for MinIO
+	})
+
 	return &storageClient{
-		client: s3.NewFromConfig(cfg),
+		client: client,
 		bucket: bucket,
 	}, nil
 }
 
-// UploadAudio uploads an audio file to S3.
+// UploadAudio uploads an audio file to S3/MinIO.
 func (s *storageClient) UploadAudio(ctx context.Context, file io.Reader, key string, contentType string) (string, error) {
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
@@ -64,7 +81,7 @@ func (s *storageClient) GetPresignedURL(ctx context.Context, key string, expirat
 	return request.URL, nil
 }
 
-// DeleteAudio deletes an audio file from S3.
+// DeleteAudio deletes an audio file from S3/MinIO.
 func (s *storageClient) DeleteAudio(ctx context.Context, key string) error {
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.bucket),
