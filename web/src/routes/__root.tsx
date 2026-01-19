@@ -1,6 +1,7 @@
-import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
+import { Outlet, createRootRouteWithContext, useLocation } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { Toaster } from 'sonner'
 
 import TanStackQueryDevtools from '@/integrations/tanstack-query/devtools'
 import { AuthProvider } from '@/contexts/AuthContext'
@@ -19,17 +20,27 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 })
 
 function RootComponent() {
+  const location = useLocation()
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
+
   return (
     <AuthProvider>
       <AudioPlayerProvider>
-        <SidebarProvider defaultOpen={false}>
-          <AppSidebar />
-          <SidebarInset>
-            <main className="flex-1 overflow-auto">
-              <Outlet />
-            </main>
-          </SidebarInset>
-        </SidebarProvider>
+        {isAuthPage ? (
+          <main className="flex-1 overflow-auto">
+            <Outlet />
+          </main>
+        ) : (
+          <SidebarProvider defaultOpen={false}>
+            <AppSidebar />
+            <SidebarInset>
+              <main className="flex-1 overflow-auto">
+                <Outlet />
+              </main>
+            </SidebarInset>
+          </SidebarProvider>
+        )}
+        <Toaster position="top-center" />
         <TanStackDevtools
           config={{
             position: 'bottom-right',

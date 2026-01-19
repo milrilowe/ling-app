@@ -7,6 +7,7 @@ import { useCreateThread } from '@/hooks/use-thread'
 import { useEffect, useRef } from 'react'
 import { sendAudioMessage } from '@/lib/api'
 import { useAudioPlayerContext } from '@/contexts/AudioPlayerContext'
+import { handleError } from '@/lib/error-handler'
 
 interface ConversationUIProps {
   threadId?: string
@@ -76,7 +77,7 @@ export function ConversationUI({ threadId }: ConversationUIProps) {
             : undefined,
         })
       } catch (error) {
-        console.error('Failed to create thread or send message:', error)
+        handleError(error, 'Failed to create thread or send message')
         audioPlayer.setConversationState('idle')
       }
     } else {
