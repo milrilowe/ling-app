@@ -64,13 +64,24 @@ func (c *mlClient) AnalyzePronunciation(ctx context.Context, audioURL, expectedT
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ML service returned status %d", resp.StatusCode)
-	}
-
+	// Decode response regardless of status code to check for structured errors
 	var result PronunciationResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Check for ML service errors in response body
+	if result.Status == "error" && result.Error != nil {
+		return nil, &MLServiceError{
+			Code:      result.Error.Code,
+			Message:   result.Error.Message,
+			Retryable: result.Error.Retryable,
+		}
+	}
+
+	// Check HTTP status code for non-200 responses without structured errors
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ML service returned status %d", resp.StatusCode)
 	}
 
 	return &result, nil

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"time"
 
@@ -82,8 +83,16 @@ func (w *PronunciationWorker) AnalyzeAsync(messageID uuid.UUID, audioKey, expect
 	// Call ML service
 	result, err := w.MLClient.AnalyzePronunciation(ctx, presignedURL, expectedText, language)
 	if err != nil {
-		log.Printf("[PronunciationWorker] ML service call failed: %v", err)
-		w.markFailed(messageID, "ML_SERVICE_ERROR", err.Error())
+		// Check if it's a structured ML service error
+		var mlErr *client.MLServiceError
+		if errors.As(err, &mlErr) {
+			log.Printf("[PronunciationWorker] ML service error: %s - %s", mlErr.Code, mlErr.Message)
+			w.markFailed(messageID, mlErr.Code, mlErr.Message)
+		} else {
+			// Network or other error
+			log.Printf("[PronunciationWorker] ML service call failed: %v", err)
+			w.markFailed(messageID, "ML_SERVICE_ERROR", err.Error())
+		}
 		return
 	}
 

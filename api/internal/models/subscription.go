@@ -19,8 +19,8 @@ const (
 // TierCredits defines how many credits each tier gets per month
 var TierCredits = map[SubscriptionTier]int{
 	TierFree:  20,
-	TierBasic: 200,
-	TierPro:   600,
+	TierBasic: 400,  // Increased from 200
+	TierPro:   1200, // Increased from 600
 }
 
 // Subscription tracks a user's Stripe subscription status

@@ -14,11 +14,11 @@ import (
 )
 
 type SubscriptionHandler struct {
-	stripeService  *services.StripeService
-	creditsService *services.CreditsService
+	stripeService  services.StripeProcessor
+	creditsService services.CreditsManager
 }
 
-func NewSubscriptionHandler(stripeService *services.StripeService, creditsService *services.CreditsService) *SubscriptionHandler {
+func NewSubscriptionHandler(stripeService services.StripeProcessor, creditsService services.CreditsManager) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		stripeService:  stripeService,
 		creditsService: creditsService,

@@ -124,6 +124,11 @@ func (s *ConversationService) processUserAudio(
 		return nil, fmt.Errorf("failed to transcribe audio: %w", err)
 	}
 
+	// Validate audio duration
+	if transcription.Duration < 1.0 {
+		return nil, ErrAudioTooShort
+	}
+
 	// Save user message with audio (pronunciation analysis pending)
 	userMessage := models.Message{
 		ID:                   userMessageID,

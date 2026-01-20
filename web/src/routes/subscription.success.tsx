@@ -47,9 +47,9 @@ function SubscriptionSuccessPage() {
           <div className="space-y-2 text-sm">
             <p className="text-muted-foreground">With {tierInfo.name}, you can:</p>
             <ul className="space-y-1">
-              <li>• Send up to {Math.floor(tierInfo.credits / 1)} text messages/month</li>
-              <li>• Send up to {Math.floor(tierInfo.credits / 5)} audio messages/month</li>
-              <li>• Get pronunciation feedback on every audio message</li>
+              <li>• Practice up to {tierInfo.credits} times per month</li>
+              <li>• Get pronunciation feedback on every recording</li>
+              <li>• Track your progress with detailed phoneme statistics</li>
             </ul>
           </div>
 

@@ -41,6 +41,12 @@ func handleError(c *gin.Context, err error, operation string) {
 	case errors.Is(err, services.ErrInsufficientCredits):
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "Insufficient credits"})
 
+	// Validation errors
+	case errors.Is(err, services.ErrAudioTooShort):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Audio must be at least 1 second long. Please record a longer message."})
+	case errors.Is(err, services.ErrAudioInvalid):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid audio file"})
+
 	// Default to internal server error
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})

@@ -343,3 +343,52 @@ func TestConversationService_ProcessAudioMessage_WithPronunciationWorker(t *test
 	assert.NotNil(t, turn)
 	// Test passes even without pronunciation worker
 }
+
+func TestConversationService_ProcessAudioMessage_AudioTooShort(t *testing.T) {
+	// Setup
+	threadID := uuid.New()
+	audioContent := []byte("fake audio data")
+	audioFile := newMockMultipartFile(audioContent)
+	fileHeader := &multipart.FileHeader{
+		Filename: "test.webm",
+		Size:     int64(len(audioContent)),
+	}
+
+	// Mock repositories
+	messageRepo := new(repomocks.MockMessageRepository)
+
+	// Mock clients
+	whisperClient := new(clientmocks.MockWhisperClient)
+	storageClient := new(clientmocks.MockStorageClient)
+
+	// Mock storage operations
+	storageClient.On("UploadAudio", mock.Anything, mock.Anything, mock.Anything, "audio/webm").Return("", nil)
+	storageClient.On("GetPresignedURL", mock.Anything, mock.Anything, mock.Anything).Return("http://example.com/audio.webm", nil)
+
+	// Mock transcription with short audio (0.5 seconds)
+	whisperClient.On("TranscribeFromURL", mock.Anything, "http://example.com/audio.webm").Return(&client.TranscriptionResult{
+		Text:     "hi",
+		Language: "en",
+		Duration: 0.5, // Less than 1 second
+	}, nil)
+
+	// Create service
+	service := NewConversationService(
+		nil, messageRepo, nil, whisperClient, nil, nil, storageClient, nil,
+		10*1024*1024,
+	)
+
+	// Execute
+	turn, err := service.ProcessAudioMessage(context.Background(), threadID, audioFile, fileHeader)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, turn)
+	assert.ErrorIs(t, err, ErrAudioTooShort)
+
+	// Verify mocks
+	whisperClient.AssertExpectations(t)
+	storageClient.AssertExpectations(t)
+	// Message should NOT be created since validation failed
+	messageRepo.AssertNotCalled(t, "Create")
+}

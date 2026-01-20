@@ -24,6 +24,19 @@ type TxRunner interface {
 	Transaction(fc func(tx *gorm.DB) error, opts ...*sql.TxOptions) error
 }
 
+// CreditsManager defines the interface for credits operations
+type CreditsManager interface {
+	GetCredits(userID uuid.UUID) (*models.Credits, error)
+	GetBalance(userID uuid.UUID) (int, error)
+	HasCredits(userID uuid.UUID, amount int) (bool, error)
+	DeductCredits(userID uuid.UUID, amount int, reference, description string) error
+	AddCredits(userID uuid.UUID, amount int, description string) error
+	RefreshMonthlyCredits(userID uuid.UUID) error
+	InitializeCredits(userID uuid.UUID, tier models.SubscriptionTier) error
+	UpdateAllowance(userID uuid.UUID, tier models.SubscriptionTier) error
+	GetTransactionHistory(userID uuid.UUID, limit int) ([]models.CreditTransaction, error)
+}
+
 // CreditsService handles credit balance operations
 type CreditsService struct {
 	db          *db.DB

@@ -16,6 +16,7 @@ import (
 	portalsession "github.com/stripe/stripe-go/v82/billingportal/session"
 	"github.com/stripe/stripe-go/v82/checkout/session"
 	"github.com/stripe/stripe-go/v82/customer"
+	"github.com/stripe/stripe-go/v82/subscription"
 	"github.com/stripe/stripe-go/v82/webhook"
 	"gorm.io/gorm"
 )
@@ -24,6 +25,15 @@ var (
 	ErrSubscriptionNotFound = errors.New("subscription not found")
 	ErrInvalidWebhook       = errors.New("invalid webhook signature")
 )
+
+// StripeProcessor defines the interface for Stripe operations
+type StripeProcessor interface {
+	GetSubscription(userID uuid.UUID) (*models.Subscription, error)
+	GetOrCreateSubscription(userID uuid.UUID, email, name string) (*models.Subscription, error)
+	CreateCheckoutSession(userID uuid.UUID, email, name string, tier models.SubscriptionTier) (string, error)
+	CreatePortalSession(userID uuid.UUID) (string, error)
+	HandleWebhook(payload []byte, signature string) error
+}
 
 type StripeService struct {
 	config         *config.Config
@@ -118,6 +128,12 @@ func (s *StripeService) CreateCheckoutSession(userID uuid.UUID, email, name stri
 		return "", fmt.Errorf("price not configured for tier: %s", tier)
 	}
 
+	// If user already has an active subscription, update it instead of creating new
+	if sub.StripeSubscriptionID != nil && *sub.StripeSubscriptionID != "" {
+		return s.updateExistingSubscription(sub, priceID, tier)
+	}
+
+	// Create new subscription via checkout
 	params := &stripe.CheckoutSessionParams{
 		Customer: stripe.String(sub.StripeCustomerID),
 		Mode:     stripe.String(string(stripe.CheckoutSessionModeSubscription)),
@@ -139,6 +155,60 @@ func (s *StripeService) CreateCheckoutSession(userID uuid.UUID, email, name stri
 	}
 
 	return sess.URL, nil
+}
+
+// updateExistingSubscription updates an existing Stripe subscription to a new price
+// This handles upgrades (Basic → Pro) and downgrades (Pro → Basic) with automatic proration
+func (s *StripeService) updateExistingSubscription(sub *models.Subscription, newPriceID string, newTier models.SubscriptionTier) (string, error) {
+	// Get the current Stripe subscription
+	stripeSub, err := subscription.Get(*sub.StripeSubscriptionID, nil)
+	if err != nil {
+		return "", fmt.Errorf("get stripe subscription: %w", err)
+	}
+
+	// Get the current subscription item ID
+	if len(stripeSub.Items.Data) == 0 {
+		return "", fmt.Errorf("no items in subscription")
+	}
+	itemID := stripeSub.Items.Data[0].ID
+
+	// Update the subscription with new price
+	// Stripe automatically handles proration (credits for unused time)
+	updateParams := &stripe.SubscriptionParams{
+		Items: []*stripe.SubscriptionItemsParams{
+			{
+				ID:    stripe.String(itemID),
+				Price: stripe.String(newPriceID),
+			},
+		},
+		ProrationBehavior: stripe.String("always_invoice"),
+	}
+
+	_, err = subscription.Update(*sub.StripeSubscriptionID, updateParams)
+	if err != nil {
+		return "", fmt.Errorf("update subscription: %w", err)
+	}
+
+	// Update local database
+	sub.Tier = newTier
+	sub.StripePriceID = &newPriceID
+	if err := s.subRepo.Save(s.exec, sub); err != nil {
+		log.Printf("Failed to update local subscription: %v", err)
+	}
+
+	// Update credits allowance
+	if err := s.creditsService.UpdateAllowance(sub.UserID, newTier); err != nil {
+		log.Printf("Failed to update allowance: %v", err)
+	}
+
+	// Grant new tier credits immediately
+	newAllowance := models.TierCredits[newTier]
+	if err := s.creditsService.AddCredits(sub.UserID, newAllowance, fmt.Sprintf("Upgraded to %s", newTier)); err != nil {
+		log.Printf("Failed to add upgrade credits: %v", err)
+	}
+
+	// Return success URL (user stays on same page, subscription updated)
+	return s.config.StripeSuccessURL, nil
 }
 
 // CreatePortalSession creates a billing portal URL
