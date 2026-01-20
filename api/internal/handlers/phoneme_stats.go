@@ -10,10 +10,10 @@ import (
 )
 
 type PhonemeStatsHandler struct {
-	PhonemeStatsService *services.PhonemeStatsService
+	PhonemeStatsService services.PhonemeStatsProvider
 }
 
-func NewPhonemeStatsHandler(phonemeStatsService *services.PhonemeStatsService) *PhonemeStatsHandler {
+func NewPhonemeStatsHandler(phonemeStatsService services.PhonemeStatsProvider) *PhonemeStatsHandler {
 	return &PhonemeStatsHandler{
 		PhonemeStatsService: phonemeStatsService,
 	}
@@ -26,7 +26,7 @@ func (h *PhonemeStatsHandler) GetStats(c *gin.Context) {
 
 	stats, err := h.PhonemeStatsService.GetUserStats(user.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch phoneme stats"})
+		handleError(c, err, "GetStats")
 		return
 	}
 

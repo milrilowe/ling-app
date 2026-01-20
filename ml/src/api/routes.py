@@ -5,7 +5,7 @@ API route handlers for pronunciation analysis.
 import time
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 import httpx
 
 import base64

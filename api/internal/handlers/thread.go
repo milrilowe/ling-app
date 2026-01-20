@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	"bytes"
-	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -23,38 +20,26 @@ type ThreadHandler struct {
 	exec                repository.Executor
 	threadRepo          repository.ThreadRepository
 	messageRepo         repository.MessageRepository
+	conversationService services.ConversationProcessor
 	OpenAIClient        client.OpenAIClient
-	Storage             client.StorageClient
-	WhisperClient       client.WhisperClient
-	TTSClient           client.TTSClient
-	PronunciationWorker *services.PronunciationWorker
 	CreditsService      *services.CreditsService
-	MaxAudioFileSize    int64
 }
 
 func NewThreadHandler(
 	exec repository.Executor,
 	threadRepo repository.ThreadRepository,
 	messageRepo repository.MessageRepository,
+	conversationService services.ConversationProcessor,
 	openAIClient client.OpenAIClient,
-	storage client.StorageClient,
-	whisper client.WhisperClient,
-	ttsClient client.TTSClient,
-	pronunciationWorker *services.PronunciationWorker,
 	creditsService *services.CreditsService,
-	maxAudioFileSize int64,
 ) *ThreadHandler {
 	return &ThreadHandler{
 		exec:                exec,
 		threadRepo:          threadRepo,
 		messageRepo:         messageRepo,
+		conversationService: conversationService,
 		OpenAIClient:        openAIClient,
-		Storage:             storage,
-		WhisperClient:       whisper,
-		TTSClient:           ttsClient,
-		PronunciationWorker: pronunciationWorker,
 		CreditsService:      creditsService,
-		MaxAudioFileSize:    maxAudioFileSize,
 	}
 }
 
@@ -69,7 +54,7 @@ func (h *ThreadHandler) GetThreads(c *gin.Context) {
 
 	threads, err := h.threadRepo.FindByUserID(h.exec, user.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch threads"})
+		handleError(c, err, "GetThreads")
 		return
 	}
 	c.JSON(http.StatusOK, threads)
@@ -81,7 +66,7 @@ func (h *ThreadHandler) GetArchivedThreads(c *gin.Context) {
 
 	threads, err := h.threadRepo.FindArchivedByUserID(h.exec, user.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch archived threads"})
+		handleError(c, err, "GetArchivedThreads")
 		return
 	}
 	c.JSON(http.StatusOK, threads)
@@ -247,188 +232,33 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// Validate file size
-	if h.MaxAudioFileSize > 0 && fileHeader.Size > h.MaxAudioFileSize {
-		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
-			"error":   "Audio file too large",
-			"maxSize": h.MaxAudioFileSize,
-		})
-		return
-	}
-
-	// Create user message ID
-	userMessageID := uuid.New()
-
-	// Upload user audio to storage
-	userAudioKey := fmt.Sprintf("user/%s/%s.webm", parsedID, userMessageID)
-	ctx := context.Background()
-	_, err = h.Storage.UploadAudio(ctx, file, userAudioKey, "audio/webm")
+	// Process audio message via ConversationService
+	turn, err := h.conversationService.ProcessAudioMessage(c.Request.Context(), parsedID, file, fileHeader)
 	if err != nil {
-		log.Printf("Error uploading user audio: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload audio"})
-		return
-	}
-
-	// Get presigned URL for ML service to access the audio
-	audioPresignedURL, err := h.Storage.GetPresignedURL(ctx, userAudioKey, 5*time.Minute)
-	if err != nil {
-		log.Printf("Error getting presigned URL: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process audio"})
-		return
-	}
-
-	// Transcribe audio using local Whisper via ML service
-	transcription, err := h.WhisperClient.TranscribeFromURL(ctx, audioPresignedURL)
-	if err != nil {
-		log.Printf("Error transcribing audio: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to transcribe audio"})
-		return
-	}
-
-	// Save user message with audio (pronunciation analysis pending)
-	userMessage := models.Message{
-		ID:                   userMessageID,
-		ThreadID:             parsedID,
-		Role:                 "user",
-		Content:              transcription.Text,
-		AudioURL:             &userAudioKey,
-		AudioDurationSeconds: &transcription.Duration,
-		HasAudio:             true,
-		Timestamp:            time.Now(),
-		PronunciationStatus:  "pending",
-	}
-
-	if err := h.messageRepo.Create(h.exec, &userMessage); err != nil {
-		log.Printf("Error creating user message: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message"})
-		return
-	}
-
-	// Spawn pronunciation analysis in background (non-blocking)
-	if h.PronunciationWorker != nil {
-		go h.PronunciationWorker.AnalyzeAsync(userMessageID, userAudioKey, transcription.Text, "en-us")
-	}
-
-	// Get conversation history
-	messages, err := h.messageRepo.FindByThreadID(h.exec, parsedID)
-	if err != nil {
-		log.Printf("Error fetching messages: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
-		return
-	}
-
-	// Convert to OpenAI format
-	conversationHistory := make([]client.ConversationMessage, len(messages))
-	for i, msg := range messages {
-		conversationHistory[i] = client.ConversationMessage{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
-	}
-
-	// Generate AI response
-	aiResponse, err := h.OpenAIClient.Generate(conversationHistory)
-	if err != nil {
-		log.Printf("Error generating AI response: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate response"})
-		return
-	}
-
-	// Generate TTS for AI response
-	assistantMessageID := uuid.New()
-	ttsResult, err := h.TTSClient.Synthesize(ctx, aiResponse)
-	if err != nil {
-		log.Printf("Error generating TTS: %v", err)
-		// Continue without audio - save text-only response
-		responseMessage := models.Message{
-			ID:        assistantMessageID,
-			ThreadID:  parsedID,
-			Role:      "assistant",
-			Content:   aiResponse,
-			HasAudio:  false,
-			Timestamp: time.Now(),
-		}
-
-		if err := h.messageRepo.Create(h.exec, &responseMessage); err != nil {
-			log.Printf("Error creating AI response: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create response"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"userMessage":      userMessage,
-			"assistantMessage": responseMessage,
-		})
-		return
-	}
-
-	// Upload TTS audio to storage
-	assistantAudioKey := fmt.Sprintf("assistant/%s/%s.mp3", parsedID, assistantMessageID)
-	audioReader := bytes.NewReader(ttsResult.AudioBytes)
-	_, err = h.Storage.UploadAudio(ctx, audioReader, assistantAudioKey, "audio/mpeg")
-	if err != nil {
-		log.Printf("Error uploading TTS audio: %v", err)
-		// Continue without audio
-		responseMessage := models.Message{
-			ID:        assistantMessageID,
-			ThreadID:  parsedID,
-			Role:      "assistant",
-			Content:   aiResponse,
-			HasAudio:  false,
-			Timestamp: time.Now(),
-		}
-
-		if err := h.messageRepo.Create(h.exec, &responseMessage); err != nil {
-			log.Printf("Error creating AI response: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create response"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"userMessage":      userMessage,
-			"assistantMessage": responseMessage,
-		})
-		return
-	}
-
-	// Save AI response with audio
-	ttsDuration := ttsResult.Duration
-	responseMessage := models.Message{
-		ID:                   assistantMessageID,
-		ThreadID:             parsedID,
-		Role:                 "assistant",
-		Content:              aiResponse,
-		AudioURL:             &assistantAudioKey,
-		AudioDurationSeconds: &ttsDuration,
-		HasAudio:             true,
-		Timestamp:            time.Now(),
-	}
-
-	if err := h.messageRepo.Create(h.exec, &responseMessage); err != nil {
-		log.Printf("Error creating AI response: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create response"})
+		log.Printf("Error processing audio message: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process audio message"})
 		return
 	}
 
 	// Auto-generate thread name from AI response (async)
-	go h.generateThreadName(thread.ID, aiResponse)
+	go h.generateThreadName(thread.ID, turn.AssistantMessage.Content)
 
 	// Deduct credits for voice message
 	if h.CreditsService != nil {
 		cost := middleware.GetCreditsCost(c)
 		if cost > 0 {
-			if err := h.CreditsService.DeductCredits(user.ID, cost, responseMessage.ID.String(), "Voice message"); err != nil {
+			if err := h.CreditsService.DeductCredits(user.ID, cost, turn.AssistantMessage.ID.String(), "Voice message"); err != nil {
 				// Credit deduction failed - this is a billing issue that needs attention
 				// The message was already processed, so we return it but log the error prominently
-				log.Printf("CRITICAL: Failed to deduct credits for user %s, message %s: %v", user.ID, responseMessage.ID, err)
+				log.Printf("CRITICAL: Failed to deduct credits for user %s, message %s: %v", user.ID, turn.AssistantMessage.ID, err)
 				// Still return success since the message was processed - but this needs monitoring
 			}
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"userMessage":      userMessage,
-		"assistantMessage": responseMessage,
+		"userMessage":      turn.UserMessage,
+		"assistantMessage": turn.AssistantMessage,
 	})
 }
 

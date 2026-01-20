@@ -59,12 +59,14 @@ func (s *AuthService) DeleteSession(token string) error {
 }
 
 // DeleteAllUserSessions removes all sessions for a user (logout everywhere).
+// TODO: Wire to handler for "logout everywhere" feature
 func (s *AuthService) DeleteAllUserSessions(userID uuid.UUID) error {
 	return s.sessionRepo.DeleteByUserID(s.exec, userID)
 }
 
 // CleanupExpiredSessions removes all expired sessions from the database.
 // This should be called periodically (e.g., via a background goroutine).
+// TODO: Schedule as background job for session cleanup
 func (s *AuthService) CleanupExpiredSessions() (int64, error) {
 	return s.sessionRepo.DeleteExpiredBefore(s.exec, time.Now())
 }

@@ -9,6 +9,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// PhonemeStatsProvider defines the interface for phoneme statistics operations
+type PhonemeStatsProvider interface {
+	GetUserStats(userID uuid.UUID) (*UserPhonemeStatsResponse, error)
+	RecordPhonemeResults(userID uuid.UUID, phonemeDetails []client.PhonemeDetail) error
+}
+
 // PhonemeStatsService handles phoneme statistics aggregation
 type PhonemeStatsService struct {
 	db       *db.DB

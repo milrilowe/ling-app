@@ -23,6 +23,11 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+
 	// Connect to database
 	database, err := db.New(cfg.DatabaseURL)
 	if err != nil {
@@ -114,6 +119,19 @@ func main() {
 	// Initialize pronunciation worker
 	pronunciationWorker := services.NewPronunciationWorker(database, mlClient, storageClient, phonemeStatsService)
 
+	// Initialize conversation service
+	conversationService := services.NewConversationService(
+		database.DB,
+		messageRepo,
+		threadRepo,
+		whisperClient,
+		openAIClient,
+		ttsClient,
+		storageClient,
+		pronunciationWorker,
+		cfg.MaxAudioFileSize,
+	)
+
 	// Initialize credits and subscription services
 	creditsService := services.NewCreditsService(database, creditsRepo, creditTxRepo)
 	subscriptionRepo := repository.NewSubscriptionRepository()
@@ -121,7 +139,7 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, oauthService, creditsService, cfg)
-	threadHandler := handlers.NewThreadHandler(database.DB, threadRepo, messageRepo, openAIClient, storageClient, whisperClient, ttsClient, pronunciationWorker, creditsService, cfg.MaxAudioFileSize)
+	threadHandler := handlers.NewThreadHandler(database.DB, threadRepo, messageRepo, conversationService, openAIClient, creditsService)
 	audioHandler := handlers.NewAudioHandler(storageClient)
 	subscriptionHandler := handlers.NewSubscriptionHandler(stripeService, creditsService)
 	phonemeStatsHandler := handlers.NewPhonemeStatsHandler(phonemeStatsService)

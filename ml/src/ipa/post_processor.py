@@ -141,39 +141,6 @@ class IPAPostProcessor:
 
         return normalized
 
-    def suggest_corrections(
-        self,
-        audio_ipa: str,
-        text_ipa: str
-    ) -> List[Dict[str, any]]:
-        """
-        Suggest potential corrections based on known common mistakes.
-
-        Args:
-            audio_ipa: IPA from audio (potentially incorrect)
-            text_ipa: IPA from text (expected)
-
-        Returns:
-            List of suggested corrections with confidence scores
-        """
-        suggestions = []
-
-        # Find mismatches
-        for i, (a_char, t_char) in enumerate(zip(audio_ipa, text_ipa)):
-            if a_char != t_char:
-                # Check if this is a known common mistake
-                for correct_char, wrong_chars in self.COMMON_MISTAKES.items():
-                    if t_char == correct_char and a_char in wrong_chars:
-                        suggestions.append({
-                            'position': i,
-                            'audio_char': a_char,
-                            'expected_char': t_char,
-                            'explanation': f'Common mistake: /{a_char}/ for /{t_char}/',
-                            'confidence': 0.7
-                        })
-
-        return suggestions
-
 
 def post_process_ipa(
     ipa_string: str,
