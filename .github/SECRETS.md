@@ -34,8 +34,11 @@ These secrets are stored in AWS SSM Parameter Store by Terraform. You provide th
 | `github_oauth_client_secret` | `/ling-prod/GITHUB_CLIENT_SECRET` | GitHub OAuth secret |
 | `stripe_secret_key` | `/ling-prod/STRIPE_SECRET_KEY` | Stripe API secret |
 | `stripe_webhook_secret` | `/ling-prod/STRIPE_WEBHOOK_SECRET` | Stripe webhook secret |
+| `stripe_price_basic` | `/ling-prod/STRIPE_PRICE_BASIC` | Stripe price ID for basic tier |
+| `stripe_price_pro` | `/ling-prod/STRIPE_PRICE_PRO` | Stripe price ID for pro tier |
+| `domain_name` | N/A | Custom domain name (e.g., example.com) |
 
-The `DATABASE_URL` is automatically generated and stored in SSM by Terraform.
+The `DATABASE_URL` and S3-related configurations are automatically generated and stored in SSM by Terraform.
 
 ## Setting Up for Deployment
 
@@ -74,11 +77,29 @@ Push to `main` branch to trigger deployment.
 
 ## Local Development
 
-For local development, copy `api/example.env` to `api/.env` and fill in the values:
+For local development, copy the example files and fill in the values:
 
 ```bash
 cp api/example.env api/.env
+cp web/example.env.local web/.env.local
 ```
+
+### Required Local Environment Variables
+
+**API (`api/.env`)**:
+- `DATABASE_URL` - PostgreSQL connection string (provided by Docker Compose)
+- `SESSION_SECRET` - Generate with: `openssl rand -hex 32`
+- `OPENAI_API_KEY` - From OpenAI dashboard
+
+**Optional API Variables** (for specific features):
+- OAuth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+- Stripe: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_BASIC`, `STRIPE_PRICE_PRO`
+- S3/MinIO: `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_REGION` (defaults work with Docker Compose)
+- Service URLs: `ML_SERVICE_URL`, `TTS_SERVICE_URL`, `STT_SERVICE_URL`, `FRONTEND_URL`
+- OAuth Redirects: `GOOGLE_REDIRECT_URL`, `GITHUB_REDIRECT_URL`
+
+**Web (`web/.env.local`)**:
+- `VITE_API_URL` - API endpoint (default: `http://localhost:8080`)
 
 **Never commit `.env` files with real credentials to the repository.**
 
