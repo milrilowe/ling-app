@@ -29,8 +29,8 @@ export function ConversationPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Utility Panel - always present */}
-      <div className="flex items-center justify-between gap-2 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* Utility Panel - desktop only */}
+      <div className="hidden md:flex items-center justify-between gap-2 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <Button variant="ghost" size="sm" className="gap-2">
           <Languages className="h-4 w-4" />
           <span>English (US)</span>
@@ -61,6 +61,28 @@ export function ConversationPage() {
           </TooltipProvider>
         )}
       </div>
+
+      {/* Mobile utility bar - compact with just view toggle */}
+      {threadId && (
+        <div className="flex md:hidden items-center justify-end gap-2 border-b bg-background/95 px-3 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <TooltipProvider>
+            <div className="flex items-center gap-1">
+              {viewMode === 'audio' && audioPlayer.currentUrl && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleRepeat}
+                  disabled={!audioPlayer.currentUrl}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              )}
+              <ViewToggle value={viewMode} onChange={setViewMode} />
+            </div>
+          </TooltipProvider>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden">

@@ -9,7 +9,7 @@ import {
   Archive,
   ArchiveRestore,
 } from 'lucide-react'
-import { SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar'
+import { SidebarMenuItem, SidebarMenuButton, useSidebar } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -41,6 +41,7 @@ export function ThreadListItem({ thread }: ThreadListItemProps) {
   const params = useParams({ strict: false })
   const isActive = params.threadId === thread.id
   const isArchived = !!thread.archivedAt
+  const { setOpenMobile, isMobile } = useSidebar()
 
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
@@ -69,6 +70,7 @@ export function ThreadListItem({ thread }: ThreadListItemProps) {
 
   const handleClick = () => {
     if (!isEditing) {
+      if (isMobile) setOpenMobile(false)
       navigate({ to: '/c/$threadId', params: { threadId: thread.id } })
     }
   }

@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ThreadListItem } from '@/features/sidebar/components/ThreadListItem'
@@ -37,8 +38,14 @@ export function AppSidebar() {
   const { data: threads, isLoading } = useThreads()
   const { data: archivedThreads } = useArchivedThreads()
   const [showArchived, setShowArchived] = useState(false)
+  const { setOpenMobile, isMobile } = useSidebar()
+
+  const closeMobileSidebar = () => {
+    if (isMobile) setOpenMobile(false)
+  }
 
   const handleNewChat = () => {
+    closeMobileSidebar()
     navigate({ to: '/' })
   }
 
@@ -143,7 +150,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <Link to="/pronunciation" className="w-full">
+            <Link to="/pronunciation" className="w-full" onClick={closeMobileSidebar}>
               <SidebarMenuButton tooltip="Pronunciation Stats">
                 <BarChart3 className="h-4 w-4" />
                 <span>Pronunciation</span>
@@ -151,7 +158,7 @@ export function AppSidebar() {
             </Link>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <Link to="/settings" className="w-full">
+            <Link to="/settings" className="w-full" onClick={closeMobileSidebar}>
               <SidebarMenuButton tooltip="Settings">
                 <Settings className="h-4 w-4" />
                 <span>Settings</span>
