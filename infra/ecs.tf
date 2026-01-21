@@ -183,6 +183,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "ML_SERVICE_URL", value = "http://ml.ling.local:8000" },
         { name = "S3_BUCKET", value = aws_s3_bucket.audio.id },
         { name = "S3_REGION", value = var.aws_region },
+        { name = "S3_ENDPOINT", value = "https://s3.${var.aws_region}.amazonaws.com" },
         { name = "CORS_ALLOWED_ORIGINS", value = "https://${var.domain_name}" },
         { name = "FRONTEND_URL", value = "https://${var.domain_name}" },
         { name = "GOOGLE_REDIRECT_URL", value = "https://${var.domain_name}/api/auth/google/callback" },

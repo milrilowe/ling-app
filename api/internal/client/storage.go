@@ -19,29 +19,45 @@ type storageClient struct {
 }
 
 // NewStorageClient creates a new storage client for S3/MinIO.
+// If accessKey is empty or "minioadmin", it uses the default AWS credential chain (IAM role).
+// Otherwise, it uses the provided static credentials (for local MinIO).
 func NewStorageClient(endpoint, accessKey, secretKey, bucket, region string) (StorageClient, error) {
-	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, regionID string, options ...interface{}) (aws.Endpoint, error) {
-		if endpoint != "" {
-			return aws.Endpoint{
-				URL:               endpoint,
-				SigningRegion:     region,
-				HostnameImmutable: true,
-			}, nil
-		}
-		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-	})
+	var cfg aws.Config
+	var err error
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithRegion(region),
-		config.WithEndpointResolverWithOptions(customResolver),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
-	)
+	// Use IAM role credentials when no explicit credentials provided (production AWS)
+	useIAMRole := accessKey == "" || accessKey == "minioadmin"
+
+	if useIAMRole {
+		cfg, err = config.LoadDefaultConfig(context.TODO(),
+			config.WithRegion(region),
+		)
+	} else {
+		// Use explicit credentials for local MinIO
+		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, regionID string, options ...interface{}) (aws.Endpoint, error) {
+			if endpoint != "" {
+				return aws.Endpoint{
+					URL:               endpoint,
+					SigningRegion:     region,
+					HostnameImmutable: true,
+				}, nil
+			}
+			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+		})
+
+		cfg, err = config.LoadDefaultConfig(context.TODO(),
+			config.WithRegion(region),
+			config.WithEndpointResolverWithOptions(customResolver),
+			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
+		)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.UsePathStyle = true // Required for MinIO
+		// Only use path style for MinIO (local development)
+		o.UsePathStyle = !useIAMRole
 	})
 
 	return &storageClient{
