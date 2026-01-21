@@ -32,8 +32,6 @@ export function PronunciationDashboard() {
   const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi])
   const scrollTo = useCallback((index: number) => emblaApi?.scrollTo(index), [emblaApi])
 
-  const activeCategory = CATEGORY_ORDER[activeIndex]
-
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
