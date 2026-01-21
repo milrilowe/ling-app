@@ -1,5 +1,9 @@
 import { useState, useRef, useCallback } from 'react'
-import { requestMicrophoneAccess, isRecordingSupported } from '@/lib/audio-utils'
+import { requestMicrophoneAccess, MicrophoneAccessError } from '@/lib/audio-utils'
+
+export type { MicrophoneAccessError }
+
+export type AudioRecorderErrorReason = 'denied' | 'not-supported' | 'not-found' | 'unknown'
 
 export interface AudioRecorderState {
   isRecording: boolean
@@ -7,6 +11,7 @@ export interface AudioRecorderState {
   recordingTime: number
   audioBlob: Blob | null
   error: string | null
+  errorReason: AudioRecorderErrorReason | null
 }
 
 export interface AudioRecorderActions {
@@ -24,6 +29,7 @@ export function useAudioRecorder() {
     recordingTime: 0,
     audioBlob: null,
     error: null,
+    errorReason: null,
   })
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -32,11 +38,6 @@ export function useAudioRecorder() {
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   const startRecording = useCallback(async () => {
-    if (!isRecordingSupported()) {
-      setState(prev => ({ ...prev, error: 'Audio recording is not supported in this browser' }))
-      return
-    }
-
     try {
       // Request microphone access
       const stream = await requestMicrophoneAccess()
@@ -93,7 +94,8 @@ export function useAudioRecorder() {
       console.error('Failed to start recording:', error)
       setState(prev => ({
         ...prev,
-        error: error instanceof Error ? error.message : 'Failed to start recording'
+        error: error instanceof Error ? error.message : 'Failed to start recording',
+        errorReason: error instanceof MicrophoneAccessError ? error.reason : 'unknown',
       }))
     }
   }, [])
@@ -154,6 +156,7 @@ export function useAudioRecorder() {
       recordingTime: 0,
       audioBlob: null,
       error: null,
+      errorReason: null,
     })
 
     // Clear chunks
