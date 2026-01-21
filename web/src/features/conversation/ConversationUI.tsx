@@ -100,9 +100,9 @@ export function ConversationUI({ threadId }: ConversationUIProps) {
   }, [threadId])
 
   return (
-    <div className="relative flex h-full flex-col items-center bg-gradient-to-br from-background via-muted/20 to-background overflow-hidden">
-      {/* Avatar Section - positioned at ~40% from top for visual balance */}
-      <div className="flex flex-col items-center gap-8 mt-[35%] sm:mt-[30%]">
+    <div className="relative flex h-full flex-col items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background overflow-hidden pb-32">
+      {/* Avatar Section - pb-32 on parent offsets center upward to account for bottom button */}
+      <div className="flex flex-col items-center gap-8">
         <AIAvatar
           isThinking={state === 'ai-thinking'}
           isSpeaking={state === 'ai-speaking'}
