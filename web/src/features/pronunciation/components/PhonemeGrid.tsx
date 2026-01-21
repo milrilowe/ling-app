@@ -66,7 +66,7 @@ export function PhonemeGrid({ activeCategory, compact = false }: PhonemeGridProp
 
   return (
     <>
-      <div className={compact ? '' : 'h-full flex items-center justify-center'}>
+      <div>
         <div className={`flex flex-wrap ${compact ? 'gap-2 justify-start' : 'gap-3 justify-center'}`}>
           {filteredPhonemes.map((phoneme) => (
             <PhonemeCard

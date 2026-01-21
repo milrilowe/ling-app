@@ -7,7 +7,7 @@ export const Route = createFileRoute('/pronunciation')({
 
 function PronunciationPage() {
   return (
-    <div className="h-screen bg-background overflow-hidden">
+    <div className="h-full md:h-auto md:min-h-full bg-background overflow-hidden md:overflow-visible">
       <PronunciationDashboard />
     </div>
   )

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import useEmblaCarousel from 'embla-carousel-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { usePhonemeStats } from '@/hooks/use-phoneme-stats'
@@ -10,6 +11,26 @@ import { CATEGORY_ORDER, CATEGORY_LABELS } from '@/data/phonemes'
 export function PronunciationDashboard() {
   const { data: stats, isLoading, error } = usePhonemeStats()
   const [activeIndex, setActiveIndex] = useState(0)
+
+  // Embla carousel for swipe gestures
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true })
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return
+    setActiveIndex(emblaApi.selectedScrollSnap())
+  }, [emblaApi])
+
+  useEffect(() => {
+    if (!emblaApi) return
+    emblaApi.on('select', onSelect)
+    return () => {
+      emblaApi.off('select', onSelect)
+    }
+  }, [emblaApi, onSelect])
+
+  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi])
+  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi])
+  const scrollTo = useCallback((index: number) => emblaApi?.scrollTo(index), [emblaApi])
 
   const activeCategory = CATEGORY_ORDER[activeIndex]
 
@@ -29,37 +50,54 @@ export function PronunciationDashboard() {
     )
   }
 
-  const goToPrev = () => {
-    setActiveIndex((prev) => (prev - 1 + CATEGORY_ORDER.length) % CATEGORY_ORDER.length)
-  }
-
-  const goToNext = () => {
-    setActiveIndex((prev) => (prev + 1) % CATEGORY_ORDER.length)
-  }
+  // Mobile header height (52px) + footer height (66px) = 118px
+  const MOBILE_HEADER_HEIGHT = 52
+  const MOBILE_FOOTER_HEIGHT = 66
 
   return (
     <>
-      {/* Mobile: Carousel layout */}
-      <div className="h-full flex items-center justify-center p-6 md:hidden">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={goToPrev}
-          className="shrink-0 h-16 w-16"
-        >
-          <ChevronLeft className="h-10 w-10" />
-        </Button>
+      {/* Mobile layout - uses CSS Grid for guaranteed header/footer positioning */}
+      <div
+        className="grid md:hidden h-full"
+        style={{
+          gridTemplateRows: `${MOBILE_HEADER_HEIGHT}px 1fr ${MOBILE_FOOTER_HEIGHT}px`,
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-2 px-4 border-b bg-background">
+          <Link to="/">
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <X className="h-5 w-5" />
+            </Button>
+          </Link>
+          <h1 className="text-lg font-semibold">Pronunciation</h1>
+        </div>
 
-        <div className="flex-1 flex flex-col items-center h-full">
-          <h2 className="text-3xl font-semibold shrink-0 pt-2">{CATEGORY_LABELS[activeCategory]}</h2>
-          <div className="flex-1 flex items-center justify-center">
-            <PhonemeGrid activeCategory={activeCategory} />
+        {/* Swipeable carousel content */}
+        <div className="overflow-hidden" ref={emblaRef}>
+          <div className="flex h-full">
+            {CATEGORY_ORDER.map((category) => (
+              <div key={category} className="flex-[0_0_100%] min-w-0 overflow-y-auto px-4 py-4">
+                <h2 className="text-xl font-semibold mb-4 text-center">{CATEGORY_LABELS[category]}</h2>
+                <div className="flex justify-center">
+                  <PhonemeGrid activeCategory={category} />
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="flex justify-center gap-2 shrink-0 pb-2">
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 border-t bg-background flex items-center justify-between">
+          <Button variant="ghost" size="icon" onClick={scrollPrev} className="h-10 w-10">
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+
+          <div className="flex gap-2">
             {CATEGORY_ORDER.map((category, index) => (
               <button
                 key={category}
-                onClick={() => setActiveIndex(index)}
+                onClick={() => scrollTo(index)}
                 className={cn(
                   'w-2.5 h-2.5 rounded-full transition-all',
                   activeIndex === index
@@ -70,16 +108,11 @@ export function PronunciationDashboard() {
               />
             ))}
           </div>
-        </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={goToNext}
-          className="shrink-0 h-16 w-16"
-        >
-          <ChevronRight className="h-10 w-10" />
-        </Button>
+          <Button variant="ghost" size="icon" onClick={scrollNext} className="h-10 w-10">
+            <ChevronRight className="h-6 w-6" />
+          </Button>
+        </div>
       </div>
 
       {/* Desktop: Scrollable grid with all categories */}

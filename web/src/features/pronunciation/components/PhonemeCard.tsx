@@ -47,22 +47,22 @@ export function PhonemeCard({
         'hover:scale-105 active:scale-95',
         compact
           ? 'p-3 min-w-[80px] min-h-[90px]'
-          : 'p-6 min-w-[160px] min-h-[180px]',
+          : 'p-4 min-w-[100px] min-h-[120px]',
         getColorClasses()
       )}
     >
-      <div className={cn('font-mono font-semibold', compact ? 'text-2xl' : 'text-5xl')}>
+      <div className={cn('font-mono font-semibold', compact ? 'text-2xl' : 'text-3xl')}>
         /{ipa}/
       </div>
-      <div className={cn('text-muted-foreground truncate max-w-full', compact ? 'text-xs mt-1' : 'text-base mt-2')}>
+      <div className={cn('text-muted-foreground truncate max-w-full', compact ? 'text-xs mt-1' : 'text-sm mt-1')}>
         {example}
       </div>
       {accuracy !== null ? (
-        <div className={cn('font-bold', compact ? 'text-sm mt-1' : 'text-xl mt-3', getAccuracyColor())}>
+        <div className={cn('font-bold', compact ? 'text-sm mt-1' : 'text-base mt-2', getAccuracyColor())}>
           {accuracy.toFixed(0)}%
         </div>
       ) : (
-        <div className={cn('text-muted-foreground', compact ? 'text-xs mt-1' : 'text-base mt-3')}>--</div>
+        <div className={cn('text-muted-foreground', compact ? 'text-xs mt-1' : 'text-sm mt-2')}>--</div>
       )}
     </button>
   )
