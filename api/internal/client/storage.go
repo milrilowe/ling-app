@@ -19,21 +19,19 @@ type storageClient struct {
 }
 
 // NewStorageClient creates a new storage client for S3/MinIO.
-// If accessKey is empty or "minioadmin", it uses the default AWS credential chain (IAM role).
-// Otherwise, it uses the provided static credentials (for local MinIO).
-func NewStorageClient(endpoint, accessKey, secretKey, bucket, region string) (StorageClient, error) {
+// In production (isProduction=true), it uses IAM role credentials via the default AWS credential chain.
+// In development (isProduction=false), it uses static credentials for local MinIO.
+func NewStorageClient(endpoint, accessKey, secretKey, bucket, region string, isProduction bool) (StorageClient, error) {
 	var cfg aws.Config
 	var err error
 
-	// Use IAM role credentials when no explicit credentials provided (production AWS)
-	useIAMRole := accessKey == "" || accessKey == "minioadmin"
-
-	if useIAMRole {
+	if isProduction {
+		// Production: Use IAM role credentials via default AWS credential chain
 		cfg, err = config.LoadDefaultConfig(context.TODO(),
 			config.WithRegion(region),
 		)
 	} else {
-		// Use explicit credentials for local MinIO
+		// Local development: Use static credentials for MinIO
 		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, regionID string, options ...interface{}) (aws.Endpoint, error) {
 			if endpoint != "" {
 				return aws.Endpoint{
@@ -57,7 +55,7 @@ func NewStorageClient(endpoint, accessKey, secretKey, bucket, region string) (St
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		// Only use path style for MinIO (local development)
-		o.UsePathStyle = !useIAMRole
+		o.UsePathStyle = !isProduction
 	})
 
 	return &storageClient{

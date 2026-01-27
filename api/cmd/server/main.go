@@ -64,25 +64,31 @@ func main() {
 	oauthService := services.NewOAuthService(cfg)
 
 	// Initialize storage client
+	isProduction := cfg.Environment == "production"
 	storageClient, err := client.NewStorageClient(
 		cfg.S3Endpoint,
 		cfg.S3AccessKey,
 		cfg.S3SecretKey,
 		cfg.S3Bucket,
 		cfg.S3Region,
+		isProduction,
 	)
 	if err != nil {
 		log.Fatal("Failed to initialize storage client:", err)
 		os.Exit(1)
 	}
 
-	// Ensure MinIO bucket exists
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	if err := storageClient.EnsureBucketExists(ctx); err != nil {
-		log.Printf("Warning: Failed to ensure bucket exists: %v", err)
+	// Ensure bucket exists (only in local dev - Terraform creates bucket in production)
+	if !isProduction {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := storageClient.EnsureBucketExists(ctx); err != nil {
+			log.Printf("Warning: Failed to ensure bucket exists: %v", err)
+		} else {
+			log.Printf("Storage bucket '%s' is ready", cfg.S3Bucket)
+		}
 	} else {
-		log.Printf("Storage bucket '%s' is ready", cfg.S3Bucket)
+		log.Printf("Production mode: using S3 bucket '%s' in region '%s'", cfg.S3Bucket, cfg.S3Region)
 	}
 
 	// Initialize AI clients
