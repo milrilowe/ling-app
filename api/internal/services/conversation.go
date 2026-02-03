@@ -128,6 +128,9 @@ func (s *ConversationService) processUserAudio(
 	if transcription.Duration < 1.0 {
 		return nil, ErrAudioTooShort
 	}
+	if transcription.Duration > 30.0 {
+		return nil, ErrAudioTooLong
+	}
 
 	// Save user message with audio (pronunciation analysis pending)
 	userMessage := models.Message{

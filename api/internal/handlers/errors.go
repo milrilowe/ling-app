@@ -44,6 +44,8 @@ func handleError(c *gin.Context, err error, operation string) {
 	// Validation errors
 	case errors.Is(err, services.ErrAudioTooShort):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Audio must be at least 1 second long. Please record a longer message."})
+	case errors.Is(err, services.ErrAudioTooLong):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Audio must be 30 seconds or less. Please record a shorter message."})
 	case errors.Is(err, services.ErrAudioInvalid):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid audio file"})
 

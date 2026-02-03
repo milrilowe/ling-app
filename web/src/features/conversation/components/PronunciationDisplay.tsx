@@ -4,6 +4,24 @@ import type { PronunciationAnalysis, PhonemeDetail } from '@/lib/api'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
+function getFriendlyErrorMessage(error?: string): string {
+  if (!error) return 'Analysis failed'
+  const code = error.split(':')[0]?.trim()
+  switch (code) {
+    case 'AUDIO_TOO_SHORT':
+      return 'Audio too short. Make sure it\'s at least 1 second long.'
+    case 'AUDIO_TOO_LONG':
+      return 'Audio too long. Keep it under 30 seconds.'
+    case 'AUDIO_DOWNLOAD_FAILED':
+    case 'ML_SERVICE_ERROR':
+    case 'MODELS_NOT_LOADED':
+    case 'PRESIGNED_URL_ERROR':
+      return 'Analysis temporarily unavailable. Please try again.'
+    default:
+      return 'Analysis failed. Please try recording again.'
+  }
+}
+
 interface PronunciationDisplayProps {
   status: 'none' | 'pending' | 'complete' | 'failed'
   analysis?: PronunciationAnalysis
@@ -135,7 +153,7 @@ export function PronunciationDisplay({
       <div className="flex items-center gap-2 rounded-b-2xl bg-destructive/10 px-4 py-2">
         <AlertCircle className="h-4 w-4 text-destructive" />
         <span className="text-xs text-destructive">
-          {error || 'Analysis failed'}
+          {getFriendlyErrorMessage(error)}
         </span>
       </div>
     )
