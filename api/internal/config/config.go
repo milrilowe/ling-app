@@ -130,14 +130,19 @@ func getEnv(key, defaultValue string) string {
 
 // Validate checks that required configuration values are set and valid
 func (c *Config) Validate() error {
-	// Required fields
+	// Required fields (always needed)
 	required := map[string]string{
-		"DATABASE_URL":    c.DatabaseURL,
-		"SESSION_SECRET":  c.SessionSecret,
-		"S3_ENDPOINT":     c.S3Endpoint,
-		"S3_ACCESS_KEY":   c.S3AccessKey,
-		"S3_SECRET_KEY":   c.S3SecretKey,
-		"S3_BUCKET":       c.S3Bucket,
+		"DATABASE_URL":   c.DatabaseURL,
+		"SESSION_SECRET": c.SessionSecret,
+		"S3_BUCKET":      c.S3Bucket,
+	}
+
+	// In development, S3 endpoint and credentials are required for MinIO
+	// In production, IAM roles are used instead (no explicit credentials needed)
+	if c.Environment != "production" {
+		required["S3_ENDPOINT"] = c.S3Endpoint
+		required["S3_ACCESS_KEY"] = c.S3AccessKey
+		required["S3_SECRET_KEY"] = c.S3SecretKey
 	}
 
 	for name, value := range required {
