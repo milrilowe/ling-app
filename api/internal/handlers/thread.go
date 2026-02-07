@@ -235,8 +235,7 @@ func (h *ThreadHandler) SendAudioMessage(c *gin.Context) {
 	// Process audio message via ConversationService
 	turn, err := h.conversationService.ProcessAudioMessage(c.Request.Context(), parsedID, file, fileHeader)
 	if err != nil {
-		log.Printf("Error processing audio message: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process audio message"})
+		handleError(c, err, "ProcessAudioMessage")
 		return
 	}
 
