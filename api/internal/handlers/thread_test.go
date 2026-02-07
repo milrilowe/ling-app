@@ -360,7 +360,7 @@ func TestThreadHandler_SendAudioMessage_ProcessingError(t *testing.T) {
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "Failed to process audio message", response["error"])
+	assert.Equal(t, "Internal server error", response["error"])
 
 	threadRepo.AssertExpectations(t)
 	conversationService.AssertExpectations(t)
