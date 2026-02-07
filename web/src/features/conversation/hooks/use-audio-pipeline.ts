@@ -1,7 +1,6 @@
 import { useCallback, useEffect } from 'react'
 import { useSendAudioMessage } from '@/hooks/use-send-audio-message'
 import { useAudioPlayerContext } from '@/contexts/AudioPlayerContext'
-import { handleError } from '@/lib/error-handler'
 
 interface AudioPipelineOptions {
   threadId: string
@@ -32,7 +31,7 @@ export function useAudioPipeline({ threadId, onAudioEnded, onError }: AudioPipel
         audioPlayer.setConversationState('idle')
       }
     } catch (error) {
-      handleError(error, 'Audio pipeline error')
+      // Global mutation onError handler shows the toast
       audioPlayer.setConversationState('idle')
       onError?.(error instanceof Error ? error : new Error('Unknown error'))
     }
