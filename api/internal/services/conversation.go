@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"mime/multipart"
+	"strings"
 	"time"
 
 	"ling-app/api/internal/client"
@@ -121,6 +122,11 @@ func (s *ConversationService) processUserAudio(
 	// Transcribe audio
 	transcription, err := s.whisperClient.TranscribeFromURL(ctx, audioPresignedURL)
 	if err != nil {
+		// Check if error indicates audio is too short
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "too short") || strings.Contains(errMsg, "AUDIO_TOO_SHORT") {
+			return nil, ErrAudioTooShort
+		}
 		return nil, fmt.Errorf("failed to transcribe audio: %w", err)
 	}
 
